@@ -1,0 +1,283 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "SEC Research Assistant",
+    "output": "docs/architecture/sec-research-assistant.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "sec_edgar",
+      "type": "external",
+      "label": "SEC EDGAR",
+      "sublabel": "10-K filings + XBRL facts",
+      "pos": [40, 220],
+      "size": [160, 68]
+    },
+    {
+      "id": "airflow",
+      "type": "backend",
+      "label": "Airflow",
+      "sublabel": "Schedule · retry · backfill",
+      "pos": [305, 40],
+      "size": [170, 68]
+    },
+    {
+      "id": "ingestor",
+      "type": "backend",
+      "label": "Python ingestor",
+      "sublabel": "Discover + download changes",
+      "tag": "identified + throttled",
+      "pos": [300, 220],
+      "size": [180, 72]
+    },
+    {
+      "id": "raw_store",
+      "type": "cloud",
+      "label": "MinIO raw store",
+      "sublabel": "Original files + manifest",
+      "tag": "content hashes",
+      "pos": [580, 220],
+      "size": [180, 72]
+    },
+    {
+      "id": "fact_pipeline",
+      "type": "backend",
+      "label": "Fact pipeline",
+      "sublabel": "Normalize periods + units",
+      "tag": "Python + dbt",
+      "pos": [40, 420],
+      "size": [180, 72]
+    },
+    {
+      "id": "financial_marts",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "Annual financial marts",
+      "tag": "source traceability",
+      "pos": [340, 420],
+      "size": [180, 72]
+    },
+    {
+      "id": "document_pipeline",
+      "type": "backend",
+      "label": "Document pipeline",
+      "sublabel": "Sections · passages · embeddings",
+      "tag": "changed content only",
+      "pos": [600, 420],
+      "size": [180, 76]
+    },
+    {
+      "id": "passage_index",
+      "type": "database",
+      "label": "pgvector",
+      "sublabel": "Passages + source metadata",
+      "tag": "provenance retained",
+      "pos": [900, 420],
+      "size": [180, 76]
+    },
+    {
+      "id": "question",
+      "type": "external",
+      "label": "Research question",
+      "sublabel": "Single company",
+      "pos": [40, 760],
+      "size": [180, 68]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "FastAPI",
+      "sublabel": "Validate company · metric · period",
+      "pos": [300, 760],
+      "size": [180, 72]
+    },
+    {
+      "id": "approved_tools",
+      "type": "security",
+      "label": "Approved tools",
+      "sublabel": "Read-only SQL + filtered retrieval",
+      "tag": "no autonomous SQL",
+      "pos": [600, 760],
+      "size": [190, 76]
+    },
+    {
+      "id": "grounding",
+      "type": "backend",
+      "label": "Grounded generation",
+      "sublabel": "Calculations + cited evidence",
+      "tag": "abstain if unsupported",
+      "pos": [600, 950],
+      "size": [190, 76]
+    },
+    {
+      "id": "llm_api",
+      "type": "external",
+      "label": "LLM API",
+      "sublabel": "Evidence-bound explanation",
+      "pos": [900, 950],
+      "size": [190, 68]
+    },
+    {
+      "id": "answer",
+      "type": "frontend",
+      "label": "Cited answer",
+      "sublabel": "Numbers · filing sections · limits",
+      "pos": [600, 1140],
+      "size": [190, 72]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "1 · Incremental ingestion",
+      "wraps": ["airflow", "ingestor", "raw_store"],
+      "pad": 30
+    },
+    {
+      "kind": "region",
+      "label": "2 · Governed preparation",
+      "wraps": ["fact_pipeline", "financial_marts", "document_pipeline", "passage_index"],
+      "pad": 30
+    },
+    {
+      "kind": "security-group",
+      "label": "3 · Evidence-based answering",
+      "wraps": ["api", "approved_tools", "grounding"],
+      "pad": 30
+    }
+  ],
+  "connections": [
+    {
+      "id": "discover_filings",
+      "from": "sec_edgar",
+      "to": "ingestor",
+      "label": "filings + facts",
+      "variant": "emphasis"
+    },
+    {
+      "id": "orchestrate_ingestion",
+      "from": "airflow",
+      "to": "ingestor",
+      "label": "orchestrates",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "persist_raw",
+      "from": "ingestor",
+      "to": "raw_store",
+      "label": "raw + manifest",
+      "variant": "emphasis"
+    },
+    {
+      "id": "prepare_facts",
+      "from": "raw_store",
+      "to": "fact_pipeline",
+      "label": "XBRL facts"
+    },
+    {
+      "id": "build_marts",
+      "from": "fact_pipeline",
+      "to": "financial_marts",
+      "label": "dbt models + tests"
+    },
+    {
+      "id": "prepare_documents",
+      "from": "raw_store",
+      "to": "document_pipeline",
+      "label": "10-K content"
+    },
+    {
+      "id": "index_passages",
+      "from": "document_pipeline",
+      "to": "passage_index",
+      "label": "passages + vectors"
+    },
+    {
+      "id": "submit_question",
+      "from": "question",
+      "to": "api",
+      "label": "question",
+      "variant": "emphasis"
+    },
+    {
+      "id": "route_tools",
+      "from": "api",
+      "to": "approved_tools",
+      "label": "validated request",
+      "variant": "security"
+    },
+    {
+      "id": "query_metrics",
+      "from": "approved_tools",
+      "to": "financial_marts",
+      "label": "parameterized SQL",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "retrieve_evidence",
+      "from": "approved_tools",
+      "to": "passage_index",
+      "label": "metadata-filtered retrieval",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "ground_answer",
+      "from": "approved_tools",
+      "to": "grounding",
+      "label": "numbers + passages",
+      "variant": "emphasis"
+    },
+    {
+      "id": "request_completion",
+      "from": "grounding",
+      "to": "llm_api",
+      "label": "prompt + evidence",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "deliver_answer",
+      "from": "grounding",
+      "to": "answer",
+      "label": "cited response",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "MVP scope",
+      "items": [
+        "5 companies · 3 years of 10-K filings",
+        "Revenue · net income · operating cash flow",
+        "No investment advice, real-time ingest, or autonomous SQL"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Governed evidence",
+      "items": [
+        "Resolve amendments, periods, units, and duplicates explicitly",
+        "Retain accession, section, URL, hashes, and model version",
+        "Treat document text as data; separate reports from inference"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Operational proof",
+      "items": [
+        "Idempotent reruns · quarantine failures · historical backfills",
+        "Track freshness, failures, latency, and API cost",
+        "Evaluate 30–50 checked questions, including prompt injection"
+      ]
+    }
+  ]
+}
