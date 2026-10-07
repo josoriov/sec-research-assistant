@@ -1,0 +1,8 @@
+# Archify working directory: local diagram sources, receipts, and browser evidence
+.archify/
+
+# Local environment credentials: never commit real secrets
+.env
+
+# Local implementation and review notes
+.dev-notes/
