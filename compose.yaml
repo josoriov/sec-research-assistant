@@ -1,0 +1,92 @@
+# Local development stack for the SEC Research Assistant (task T001).
+#
+# Compose specification, so `docker compose` and `podman-compose` both work.
+# Every credential comes from the environment (.env); see .env.example.
+#
+# Images are fully qualified so they resolve identically under Docker and
+# Podman. The MinIO defaults point at Chainguard's maintained builds because
+# MinIO removed its own public images from Docker Hub and Quay in 2025-2026;
+# override MINIO_IMAGE / MINIO_CLIENT_IMAGE in .env if you prefer another source.
+name: sec-research-assistant
+
+services:
+  postgres:
+    image: docker.io/pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
+      # Read by db/init/01-init.sh to create the pipeline and API roles.
+      PIPELINE_DB_USER: ${PIPELINE_DB_USER:?set PIPELINE_DB_USER in .env}
+      PIPELINE_DB_PASSWORD: ${PIPELINE_DB_PASSWORD:?set PIPELINE_DB_PASSWORD in .env}
+      GOLD_API_DB_USER: ${GOLD_API_DB_USER:?set GOLD_API_DB_USER in .env}
+      GOLD_API_DB_PASSWORD: ${GOLD_API_DB_PASSWORD:?set GOLD_API_DB_PASSWORD in .env}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  minio:
+    image: ${MINIO_IMAGE:-cgr.dev/chainguard/minio:latest}
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+
+  # One-shot: creates the bronze/ bucket once MinIO accepts requests.
+  # Restarts on failure to absorb the server's startup delay (the client image
+  # is shell-less, so a retry loop is not available).
+  minio-init:
+    image: ${MINIO_CLIENT_IMAGE:-cgr.dev/chainguard/minio-client:latest}
+    restart: on-failure
+    depends_on:
+      minio:
+        condition: service_started
+    environment:
+      MC_HOST_local: http://${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env}:${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}@minio:9000
+    command: ["mb", "--ignore-existing", "local/${MINIO_BUCKET:-bronze}"]
+
+  # Placeholder for the Python application. Real source and startup command
+  # arrive in T002; this only proves the service is defined and can reach the
+  # database and object store.
+  app:
+    image: docker.io/library/python:3.12-slim
+    working_dir: /app
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:?set POSTGRES_DB in .env}
+      PIPELINE_DB_USER: ${PIPELINE_DB_USER}
+      PIPELINE_DB_PASSWORD: ${PIPELINE_DB_PASSWORD}
+      GOLD_API_DB_USER: ${GOLD_API_DB_USER}
+      GOLD_API_DB_PASSWORD: ${GOLD_API_DB_PASSWORD}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-bronze}
+    volumes:
+      - .:/app
+
+volumes:
+  pgdata:
+  minio-data:
