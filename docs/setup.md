@@ -23,6 +23,11 @@ cp .env.example .env
 Edit `.env` and replace every `change-me-*` value with a local password. `.env`
 is git-ignored and must never be committed.
 
+Also set `SEC_USER_AGENT` to a descriptive value with your contact details, for
+example `sec-research-assistant you@example.com`. SEC requires an identifying
+agent and may block requests without one; the ingester refuses to start if it is
+missing or has no `@`.
+
 `docker compose config` fails if a required variable is missing, which keeps a
 partly configured environment from starting silently.
 
@@ -43,7 +48,7 @@ commands below work with either engine; substitute `podman-compose` for
 | `postgres` | `pgvector/pgvector:pg16` | Shared database with the `bronze`, `silver`, and `gold` schemas. |
 | `minio` | Chainguard MinIO | S3-compatible archive; holds the `bronze/` bucket. |
 | `minio-init` | Chainguard `mc` client | One-shot: creates the `bronze` bucket, then exits. |
-| `app` | `python:3.12-slim` | Placeholder for the Python application; real source arrives in T002. |
+| `app` | `python:3.12-slim` | Python pipeline. Installs `requirements.txt` from the repo mount at start, then idles so commands can be run with `docker compose exec` (no Dockerfile yet). |
 
 `postgres` and `minio` write to the named volumes `pgdata` and `minio-data`, so
 database contents and downloaded files survive `docker compose restart` and
@@ -65,6 +70,45 @@ reachable, and exits non-zero on the first failure. Equivalent manual checks:
 ```sh
 docker compose exec postgres psql -U sec_admin -d sec_research -c '\dx' -c '\dn' -c '\du'
 docker compose run --rm --no-deps minio-init ls local/bronze
+```
+
+## 5. Ingest bronze
+
+The ingester fetches one company's SEC submission history (following older
+history files when the recent list does not reach the requested years), Company
+Facts, and the primary documents for each requested annual report and all of its
+10-K/A amendments. It saves the original bytes to the `bronze` MinIO bucket and
+records them in `bronze.manifest` and `bronze.source_facts`. It does not write to
+silver or gold.
+
+```sh
+docker compose exec app python -m ingestion --company AAPL --years 3
+```
+
+Company/ticker → CIK mappings live in `ingestion/mappings/companies.json`. The
+ingester applies `ingestion/schema.sql` on each run, so the bronze tables are
+created idempotently on fresh and pre-existing volumes (initialization hooks do
+not rerun). Objects are keyed by company, source, and content hash
+(`<cik>/<source>/<sha256>.<ext>`); an unchanged rerun skips the object and the
+manifest row, and a changed response is stored as a new object without
+overwriting the old one. A download that exhausts its retries is recorded as a
+`failed` manifest row (with the URL, accession, and error, but no object) so the
+source is visible for retry; a later successful fetch marks that failure
+`resolved` without duplicating the stored object.
+
+Inspect what was ingested:
+
+```sh
+docker compose exec postgres psql -U sec_admin -d sec_research \
+  -c 'SELECT source, accession, status, retrieved_at FROM bronze.manifest ORDER BY retrieved_at' \
+  -c 'SELECT count(*) FROM bronze.source_facts'
+docker compose run --rm --no-deps minio-init ls --recursive local/bronze
+```
+
+Run the ingestion tests (no network needed):
+
+```sh
+pytest tests/ingestion
 ```
 
 ## pgvector

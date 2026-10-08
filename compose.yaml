@@ -59,13 +59,14 @@ services:
       MC_HOST_local: http://${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env}:${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}@minio:9000
     command: ["mb", "--ignore-existing", "local/${MINIO_BUCKET:-bronze}"]
 
-  # Placeholder for the Python application. Real source and startup command
-  # arrive in T002; this only proves the service is defined and can reach the
-  # database and object store.
+  # Python application. Dependencies are installed from the repo mount at start
+  # because there is no Dockerfile yet (decision H003); the container then stays
+  # up so ingestion can be run with
+  #   docker compose exec app python -m ingestion --company AAPL --years 3
   app:
     image: docker.io/library/python:3.12-slim
     working_dir: /app
-    command: ["sleep", "infinity"]
+    command: ["sh", "-c", "pip install --no-cache-dir -q -r requirements.txt && exec sleep infinity"]
     restart: unless-stopped
     depends_on:
       postgres:
@@ -84,6 +85,7 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
       MINIO_BUCKET: ${MINIO_BUCKET:-bronze}
+      SEC_USER_AGENT: ${SEC_USER_AGENT:?set SEC_USER_AGENT in .env}
     volumes:
       - .:/app
 
