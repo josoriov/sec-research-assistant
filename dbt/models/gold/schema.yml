@@ -50,3 +50,37 @@ models:
         tests: [not_null]
       - name: filed_date
         tests: [not_null]
+
+  - name: retrieval_passages
+    description: >
+      Serving retrieval dataset: eligible silver passages joined to their
+      embeddings, with citation metadata and a supersession flag. Built only
+      from validated silver and the model-matching embeddings; default
+      retrieval filters is_superseded = false.
+    columns:
+      - name: passage_id
+        description: "Selected silver passage id (gold -> silver lineage)."
+        tests: [not_null, unique]
+      - name: cik
+        tests: [not_null]
+      - name: accession
+        tests: [not_null]
+      - name: manifest_id
+        description: "Bronze object reference (gold -> silver -> bronze lineage)."
+        tests: [not_null]
+      - name: passage_hash
+        tests: [not_null]
+      - name: processing_version
+        tests: [not_null]
+      - name: text
+        tests: [not_null]
+      - name: url
+        description: "Source filing URL for citations."
+        tests: [not_null]
+      - name: model_version
+        tests: [not_null]
+      - name: embedding
+        description: "pgvector embedding of the passage."
+        tests: [not_null]
+      - name: is_superseded
+        tests: [not_null]

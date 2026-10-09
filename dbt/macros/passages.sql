@@ -77,3 +77,54 @@ select
     end as quarantine_reason
 from joined
 {% endmacro %}
+
+{#
+  Supersession: a filing is superseded when a later-filed 10-K/10-K-A for the
+  same (cik, report_date) exists. Superseded passages stay in silver; the flag
+  lets default retrieval exclude them.
+#}
+{% macro select_retrieval_passages(passages_relation, filings_relation, embeddings_relation) %}
+with filings_superseded as (
+    select
+        f.*,
+        exists (
+            select 1
+            from {{ filings_relation }} newer
+            where newer.cik = f.cik
+              and newer.report_date is not distinct from f.report_date
+              and newer.filing_date > f.filing_date
+        ) as is_superseded
+    from {{ filings_relation }} f
+),
+
+joined as (
+    select
+        p.block_id as passage_id,
+        p.cik,
+        p.accession,
+        p.manifest_id,
+        p.passage_hash,
+        p.processing_version,
+        p.section,
+        p.heading,
+        p.block_ordinal,
+        p.text,
+        p.url,
+        f.form,
+        f.filing_date,
+        f.report_date,
+        f.is_superseded,
+        e.model_version,
+        e.dim,
+        e.embedding
+    from {{ passages_relation }} p
+    join filings_superseded f on f.manifest_id = p.manifest_id
+    join {{ embeddings_relation }} e
+      on e.passage_hash = p.passage_hash
+     and e.processing_version = p.processing_version
+     and e.model_version = '{{ var("embedding_model_version") }}'
+    where p.processing_version = '{{ var("active_processing_version") }}'
+)
+
+select * from joined
+{% endmacro %}

@@ -9,3 +9,7 @@ pytest>=8,<9
 
 # Document extraction (task T004): HTML -> heading-aware passages.
 beautifulsoup4>=4.12,<5
+
+# Passage embeddings (task T004): local CPU model, no API key or network at query
+# time. First use downloads the model weights (cached by sentence-transformers).
+sentence-transformers>=3,<4

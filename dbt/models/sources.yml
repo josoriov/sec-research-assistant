@@ -22,3 +22,14 @@ sources:
         description: >
           Raw heading-aware passages extracted by extraction/ from the bronze
           filing HTML, one row per bounded passage with its section and hash.
+
+  - name: silver_external
+    description: >
+      Python-generated tables in the silver schema that dbt cannot build itself.
+      embeddings/ writes passage_embeddings (dbt cannot compute vectors); gold
+      joins it to silver.passages by (passage_hash, processing_version,
+      model_version) so vectors are reused across rebuilds.
+    schema: silver
+    tables:
+      - name: passage_embeddings
+        description: One 384-dim vector per (passage hash, processing version, model version).

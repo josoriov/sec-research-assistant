@@ -23,3 +23,9 @@ models:
 # Single source of truth for the unit policy used by silver staging and tests.
 vars:
   supported_units: ["USD", "shares", "USD/shares", "pure", "Year", "Store"]
+  # Embedding model pinned for the retrieval branch; must match embeddings/encoder.py.
+  embedding_model_version: "sentence-transformers/all-MiniLM-L6-v2"
+  embedding_dim: 384
+  # Active extraction version served by gold/search; must match extraction.PROCESSING_VERSION.
+  # Older versions stay in bronze/silver for lineage but are not served.
+  active_processing_version: "extract-v3"
