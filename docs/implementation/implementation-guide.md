@@ -104,7 +104,7 @@ Read each layer from its persisted predecessor. Carry source identifiers through
 ## 8. Expand and evaluate
 
 1. Expand the verified one-company workflow to the full sample scope.
-2. Create 30–50 manually checked questions covering calculations, explanations, combined questions, and unsupported requests.
+2. Create 20–25 manually checked questions covering calculations, explanations, combined questions, and unsupported requests.
 3. Measure numerical accuracy, retrieval recall, citation support, appropriate abstention, latency, and API cost. Include documents containing misleading instructions.
 4. Verify gold → silver → bronze lineage for sample answers, rejection of invalid records, preservation of changed raw snapshots, and denial of API access to lower layers.
 5. Document setup, ingestion, serving, and recovery commands. Verify the complete workflow from a fresh checkout.
