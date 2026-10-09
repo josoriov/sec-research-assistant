@@ -1,0 +1,98 @@
+version: 2
+
+models:
+  - name: stg_source_facts
+    description: >
+      bronze.source_facts with typed values/periods and a quarantine reason.
+      Internal staging view shared by the silver models.
+    columns:
+      - name: source_fact_id
+        description: "bronze.source_facts.id — the bronze reference for this fact."
+        tests: [not_null, unique]
+      - name: quarantine_reason
+        description: "Null when the fact is valid; otherwise why it cannot advance."
+
+  - name: financial_fact_disclosures
+    description: >
+      Validated disclosure history: one row per valid bronze fact, retaining
+      every accession/form/filed_date. Gold selects the latest eligible
+      disclosure from here, so restatements that revert and ineligible-form
+      comparatives are not lost to deduplication.
+    columns:
+      - name: source_fact_id
+        description: "Bronze reference (bronze.source_facts.id) of this disclosure."
+        tests:
+          - not_null
+          - unique
+          - relationships:
+              arguments:
+                to: source('bronze', 'source_facts')
+                field: id
+      - name: cik
+        tests: [not_null]
+      - name: concept
+        tests: [not_null]
+      - name: unit
+        description: "Reported unit, normalized (trimmed), never converted."
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: "{{ var('supported_units') }}"
+      - name: period_end
+        tests: [not_null]
+      - name: value
+        description: "Typed numeric value."
+        tests: [not_null]
+      - name: filed_date
+        tests: [not_null]
+      - name: accession
+        tests: [not_null]
+
+  - name: financial_facts
+    description: >
+      Silver validated facts deduplicated to the approved grain: one row per
+      (cik, concept, unit, period_start, period_end, value), keeping the
+      earliest disclosure's bronze reference. Distinct values for the same
+      period are retained as restatement history; the full disclosure history
+      lives in financial_fact_disclosures.
+    columns:
+      - name: source_fact_id
+        description: "Bronze reference (bronze.source_facts.id) of the retained disclosure."
+        tests:
+          - not_null
+          - unique
+          - relationships:
+              arguments:
+                to: source('bronze', 'source_facts')
+                field: id
+      - name: cik
+        tests: [not_null]
+      - name: concept
+        tests: [not_null]
+      - name: unit
+        description: "Reported unit, normalized (trimmed), never converted."
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: "{{ var('supported_units') }}"
+      - name: period_end
+        tests: [not_null]
+      - name: value
+        description: "Typed numeric value."
+        tests: [not_null]
+      - name: filed_date
+        tests: [not_null]
+      - name: accession
+        tests: [not_null]
+
+  - name: financial_facts_quarantine
+    description: >
+      Facts that failed validation, with the reason and their bronze reference.
+      Excluded from gold; retained so failures stay traceable.
+    columns:
+      - name: source_fact_id
+        tests: [not_null, unique]
+      - name: reason
+        tests: [not_null]
