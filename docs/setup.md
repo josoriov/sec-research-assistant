@@ -65,7 +65,10 @@ COMPOSE="podman-compose" ./db/verify.sh     # Podman
 
 It asserts that pgvector is installed and usable, the schemas and roles exist,
 the API role is read-only and restricted to `gold`, and the configured bucket is
-reachable, and exits non-zero on the first failure. Equivalent manual checks:
+reachable, and exits non-zero on the first failure. The bucket comes from the
+app service's Compose-resolved environment, including quoted `.env` values and
+shell overrides; the one-shot Python command needs no installed packages.
+Equivalent manual checks:
 
 ```sh
 docker compose exec postgres psql -U sec_admin -d sec_research -c '\dx' -c '\dn' -c '\du'
@@ -84,6 +87,8 @@ silver or gold.
 ```sh
 docker compose exec app python -m ingestion --company AAPL --years 3
 ```
+
+`--years` must be positive; invalid counts fail before any network or storage access.
 
 Company/ticker → CIK mappings live in `ingestion/mappings/companies.json`. The
 ingester applies `ingestion/schema.sql` on each run, so the bronze tables are
@@ -110,6 +115,82 @@ Run the ingestion tests (no network needed):
 ```sh
 pytest tests/ingestion
 ```
+
+## 6. Build silver and gold with dbt
+
+Silver and gold are built from persisted bronze with dbt; the models live under
+`dbt/`. Run the ingestion first (section 5) so `bronze.source_facts` has data.
+
+The dbt installed here is **dbt Fusion 2.0.6**; its PostgreSQL adapter is
+experimental, so the build command enables it. Connection details come from the
+same `.env` variables as the rest of the stack (`dbt/profiles.yml`).
+
+```sh
+set -a; . ./.env; set +a
+export DBT_ALLOW_EXPERIMENTAL_ADAPTERS=true
+dbt build --project-dir dbt --profiles-dir dbt
+```
+
+`dbt build` runs the models in dependency order and then their tests; any failed
+test marks the build failed (nonzero exit).
+
+| Model | Layer | Grain |
+| --- | --- | --- |
+| `stg_source_facts` | silver (view) | one bronze fact, typed, with a quarantine reason |
+| `financial_fact_disclosures` | silver (table) | one row per valid disclosure, retaining every accession/form/filed_date |
+| `financial_facts` | silver (table) | the above deduplicated to one row per exact disclosure: `(cik, concept, unit, period_start, period_end, value)` |
+| `financial_facts_quarantine` | silver (table) | invalid facts plus the reason and bronze reference |
+| `metric_concepts` | gold (table) | metric → XBRL tag/unit mapping |
+| `annual_metrics` | gold (table) | one annual value per `(cik, metric, fiscal period, unit)` |
+
+Schemas are provisioned by `db/init/01-init.sh`. `dbt/macros/schema_routing.sql`
+pins models to exactly `silver` and `gold` and suppresses dbt's own
+`CREATE SCHEMA`, which keeps the pipeline role at schema-level (not
+database-level) `CREATE` privileges.
+
+### Metric mapping and annual selection
+
+Implemented in `dbt/models/gold/metric_concepts.sql` and
+`dbt/macros/annual_metrics.sql`:
+
+- **revenue** → `us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax`
+  (Apple reports this from FY2017; earlier years exist only under legacy tags
+  the MVP mapping does not include).
+- **net_income** → `us-gaap:NetIncomeLoss`
+- **operating_cash_flow** → `us-gaap:NetCashProvidedByUsedInOperatingActivities`
+
+Only durational facts of about one year (350–380 days, covering 52/53-week
+fiscal years) from 10-K/10-K/A filings with fiscal period FY, in the metric's
+mapped unit (USD), qualify. Quarterly and year-to-date values therefore never
+enter the mart and units are never mixed. Candidates come from the full
+disclosure history (`silver.financial_fact_disclosures`), not the deduplicated
+facts, so a restatement that reverts or an earlier ineligible form cannot hide
+the latest eligible value. The latest `filed_date` wins; earlier disclosures stay
+in `silver.financial_fact_disclosures`, and `annual_metrics.is_ambiguous` flags
+periods with more than one distinct value across filings.
+
+`financial_facts` deduplicates exact disclosures (the same value repeated as a
+prior-year comparative) to one row that keeps the earliest filing as its bronze
+reference; a restated, different value is kept as a separate row. Invalid facts
+are quarantined with a reason and never reach gold; malformed dates and
+out-of-range numerics are recognised with PostgreSQL's `pg_input_is_valid` so
+they quarantine instead of aborting the build. `dbt/models/**/schema.yml`
+and `dbt/tests/` assert required fields, grain uniqueness, the unit/period/annual
+guards, every record's bronze and silver references, and staging/gold
+regressions run the same macros the models use. A candidate is accepted only once
+these checks pass; publishing gold atomically so a failed build leaves the
+previous dataset available is task T007.
+
+Inspect the result and re-run the checks on their own:
+
+```sh
+docker compose exec postgres psql -U sec_admin -d sec_research \
+  -c 'SELECT metric, fiscal_year, value, accession FROM gold.annual_metrics ORDER BY metric, fiscal_year' \
+  -c 'SELECT count(*) FROM silver.financial_facts_quarantine'
+dbt test --project-dir dbt --profiles-dir dbt
+```
+
+The bronze ingestion tests are unaffected: `pytest tests/ingestion`.
 
 ## pgvector
 
