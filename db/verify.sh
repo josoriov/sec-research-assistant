@@ -12,11 +12,6 @@ set -eu
 
 COMPOSE="${COMPOSE:-docker compose}"
 
-# Bucket to check: an explicit MINIO_BUCKET wins, otherwise read the same .env
-# Compose reads, otherwise the bronze default.
-MINIO_BUCKET="${MINIO_BUCKET:-$(sed -n 's/^MINIO_BUCKET=//p' .env 2>/dev/null | tail -n 1)}"
-MINIO_BUCKET="${MINIO_BUCKET:-bronze}"
-
 echo '== PostgreSQL: pgvector, schemas, roles, and read-only gold grants =='
 $COMPOSE exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
   -v ON_ERROR_STOP=1 -q \
@@ -89,6 +84,8 @@ ROLLBACK;
 \echo 'PostgreSQL checks passed: pgvector, schemas, roles, and read-only gold grants.'
 SQL
 
+# Let Compose resolve .env, overrides and defaults; the Python image needs no packages.
+MINIO_BUCKET="$($COMPOSE run -T --rm --no-deps app python -c 'import os; print(os.environ["MINIO_BUCKET"])')"
 echo "== MinIO: ${MINIO_BUCKET} bucket =="
 $COMPOSE run -T --rm --no-deps minio-init ls "local/${MINIO_BUCKET}" >/dev/null
 echo "MinIO checks passed: ${MINIO_BUCKET} bucket reachable."
