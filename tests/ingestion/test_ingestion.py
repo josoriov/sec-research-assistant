@@ -178,6 +178,16 @@ def test_client_throttles_requests(monkeypatch):
 
 # --- filing selection and history coverage ----------------------------------
 
+@pytest.mark.parametrize("years", [0, -1])
+def test_run_rejects_nonpositive_years_before_fetching(monkeypatch, years):
+    def unexpected_mapping():
+        pytest.fail("invalid years must fail before loading configuration or fetching")
+
+    monkeypatch.setattr(pipeline, "load_mapping", unexpected_mapping)
+    with pytest.raises(SystemExit, match="years must be positive"):
+        pipeline.run("AAPL", years=years)
+
+
 def test_select_10ks_keeps_original_reports_and_amendments():
     records = [
         {"form": "10-K", "reportDate": "2022-09-24", "filingDate": "2022-10-28",

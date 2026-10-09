@@ -35,7 +35,6 @@ class SecClient:
 
     def get(self, url: str, *, retries: int = 3) -> bytes:
         """Fetch a URL, retrying temporary errors with exponential backoff."""
-        last_error: Exception | None = None
         for attempt in range(retries + 1):
             self._throttle()
             request = urllib.request.Request(url, headers={"User-Agent": self.user_agent})
@@ -44,7 +43,6 @@ class SecClient:
                     return response.read()
             except urllib.error.HTTPError as error:
                 if error.code in RETRYABLE_STATUS and attempt < retries:
-                    last_error = error
                     time.sleep(2**attempt)
                     continue
                 raise
@@ -52,8 +50,6 @@ class SecClient:
                 # TimeoutError covers response-body read timeouts as well as
                 # connection timeouts, so large downloads still retry.
                 if attempt < retries:
-                    last_error = error
                     time.sleep(2**attempt)
                     continue
                 raise
-        raise last_error  # pragma: no cover - loop always returns or raises

@@ -29,10 +29,6 @@ def load_mapping(path=MAPPING_PATH) -> dict:
     return json.loads(Path(path).read_text())
 
 
-def _sha256(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
-
-
 def _rows(section: dict) -> list:
     """Columnar SEC JSON (parallel lists) -> list of record dicts."""
     return [dict(zip(section.keys(), values)) for values in zip(*section.values())]
@@ -121,7 +117,7 @@ def _download(client, store, conn, *, cik, source, accession, url):
             bucket=store.bucket, error=f"{type(error).__name__}: {error}",
         )
         raise
-    digest = _sha256(data)
+    digest = hashlib.sha256(data).hexdigest()
     suffix = _suffix(url)
     key = object_key(cik, source, digest, suffix)
     store.put_if_absent(key, data, _content_type(suffix))
@@ -152,6 +148,8 @@ def filing_records(client, store, conn, cik, submissions, years):
 
 
 def run(company: str, years: int = 3) -> None:
+    if years < 1:
+        raise SystemExit("years must be positive")
     mapping = load_mapping()
     entry = mapping.get(company.upper())
     if not entry:
@@ -177,7 +175,8 @@ def run(company: str, years: int = 3) -> None:
         db.unpack_facts(conn, facts_manifest_id, cik, json.loads(facts_bytes))
 
         records = filing_records(client, store, conn, cik, submissions, years)
-        for filing in select_10ks(records, years):
+        selected = select_10ks(records, years)
+        for filing in selected:
             accession = filing["accessionNumber"]
             document = filing["primaryDocument"]
             url = ARCHIVE_URL.format(
@@ -186,7 +185,7 @@ def run(company: str, years: int = 3) -> None:
             _download(client, store, conn, cik=cik, source="filing",
                       accession=accession, url=url)
 
-        covered = len(_original_years(select_10ks(records, years)))
+        covered = len(_original_years(selected))
         if covered < years:
             raise SystemExit(
                 f"only {covered} of {years} requested annual reports are available for {company}"
