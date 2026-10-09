@@ -1,0 +1,15 @@
+version: 2
+
+sources:
+  - name: bronze
+    description: >
+      Raw, source-faithful SEC data written by ingestion/ (task T002). Silver
+      reads only from here; it never calls SEC directly.
+    schema: bronze
+    tables:
+      - name: source_facts
+        description: >
+          Every fact from the SEC Company Facts payload, unfiltered, one row per
+          (manifest, fact). Typed and validated downstream in silver.
+      - name: manifest
+        description: Download manifest (URL, accession, hash, status) for each bronze object.

@@ -11,3 +11,9 @@
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# dbt build artifacts and local connection state
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/
+dbt/.user.yml

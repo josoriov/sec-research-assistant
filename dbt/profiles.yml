@@ -1,0 +1,23 @@
+# dbt connection profile. Connection details come from the same environment as
+# the rest of the stack (.env), so no extra variables and no credentials are
+# committed; see .env.example and docs/setup.md.
+#
+#   set -a; . ./.env; set +a
+#   DBT_ALLOW_EXPERIMENTAL_ADAPTERS=true dbt build --project-dir dbt --profiles-dir dbt
+#
+# Reads the stack's POSTGRES_DB / POSTGRES_PORT (as set in .env), so the
+# documented shell command works unchanged, including a non-default port.
+sec_research:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('PGHOST', 'localhost') }}"
+      port: "{{ env_var('POSTGRES_PORT', '5432') | int }}"
+      user: "{{ env_var('PIPELINE_DB_USER') }}"
+      password: "{{ env_var('PIPELINE_DB_PASSWORD') }}"
+      dbname: "{{ env_var('POSTGRES_DB', 'sec_research') }}"
+      # Only used when a model does not set a custom schema; every model here
+      # does. Must be a schema the pipeline role can already use.
+      schema: "{{ env_var('DBT_SCHEMA', 'silver') }}"
+      threads: 4

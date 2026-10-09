@@ -1,0 +1,25 @@
+# dbt project for the silver and gold medallion layers (task T003).
+#
+# Silver types and validates bronze.source_facts; gold derives the annual
+# metrics mart. Schemas are provisioned by db/init/01-init.sh (T001) and the
+# pipeline role only has CREATE on those schemas, so macros/ pins the schema
+# names and suppresses dbt's own CREATE SCHEMA calls.
+name: sec_research
+version: "1.0.0"
+profile: sec_research
+model-paths: ["models"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+
+models:
+  sec_research:
+    silver:
+      +materialized: table
+      +schema: silver
+    gold:
+      +materialized: table
+      +schema: gold
+
+# Single source of truth for the unit policy used by silver staging and tests.
+vars:
+  supported_units: ["USD", "shares", "USD/shares", "pure", "Year", "Store"]
