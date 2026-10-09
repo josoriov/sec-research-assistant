@@ -96,3 +96,74 @@ models:
         tests: [not_null, unique]
       - name: reason
         tests: [not_null]
+
+  - name: filings
+    description: >
+      Validated filing documents (one row per bronze filing manifest). Source
+      links and typed filing/report dates; invalid filings quarantine.
+    columns:
+      - name: manifest_id
+        description: "Bronze reference (bronze.manifest.id)."
+        tests: [not_null, unique]
+      - name: cik
+        tests: [not_null]
+      - name: accession
+        tests: [not_null]
+      - name: form
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['10-K', '10-K/A']
+      - name: filing_date
+        tests: [not_null]
+      - name: report_date
+        tests: [not_null]
+
+  - name: filings_quarantine
+    description: "Filing documents that failed validation, with the reason."
+    columns:
+      - name: manifest_id
+        tests: [not_null, unique]
+      - name: reason
+        tests: [not_null]
+
+  - name: passages
+    description: >
+      Validated, heading-aware passages extracted from bronze filing HTML. One
+      row per bounded passage; carries its section, hash, processing version, and
+      bronze manifest reference.
+    columns:
+      - name: passage_hash
+        description: "Content hash over (text, section, processing version)."
+        tests: [not_null]
+      - name: block_id
+        tests: [not_null, unique]
+      - name: cik
+        tests: [not_null]
+      - name: accession
+        tests: [not_null]
+      - name: processing_version
+        tests: [not_null]
+      - name: text
+        description: "Nonempty passage text."
+        tests: [not_null]
+      - name: url
+        description: "Source filing URL, carried from the validated filing."
+        tests: [not_null]
+      - name: manifest_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('filings')
+                field: manifest_id
+
+  - name: passages_quarantine
+    description: "Passages that failed validation, with the reason."
+    columns:
+      - name: block_id
+        tests: [not_null, unique]
+      - name: reason
+        tests: [not_null]
+

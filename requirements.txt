@@ -6,3 +6,6 @@
 minio>=7.2,<8
 psycopg[binary]>=3.1,<4
 pytest>=8,<9
+
+# Document extraction (task T004): HTML -> heading-aware passages.
+beautifulsoup4>=4.12,<5

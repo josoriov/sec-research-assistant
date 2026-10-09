@@ -13,3 +13,12 @@ sources:
           (manifest, fact). Typed and validated downstream in silver.
       - name: manifest
         description: Download manifest (URL, accession, hash, status) for each bronze object.
+      - name: filing_documents
+        description: >
+          Raw per-filing metadata extracted by extraction/ from the preserved
+          submissions/history JSON (form, filing/report dates, primary document),
+          plus a nullable extraction_error for documents that yielded no text.
+      - name: document_blocks
+        description: >
+          Raw heading-aware passages extracted by extraction/ from the bronze
+          filing HTML, one row per bounded passage with its section and hash.
