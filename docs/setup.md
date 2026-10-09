@@ -142,6 +142,11 @@ test marks the build failed (nonzero exit).
 | `financial_facts_quarantine` | silver (table) | invalid facts plus the reason and bronze reference |
 | `metric_concepts` | gold (table) | metric → XBRL tag/unit mapping |
 | `annual_metrics` | gold (table) | one annual value per `(cik, metric, fiscal period, unit)` |
+| `filings` | silver (table) | one validated filing per bronze filing manifest |
+| `filings_quarantine` | silver (table) | invalid filings plus the reason |
+| `passages` | silver (table) | validated, heading-aware passages with section, hash, processing version |
+| `passages_quarantine` | silver (table) | invalid passages plus the reason |
+| `retrieval_passages` | gold (table) | eligible silver passages joined to their embeddings, with citation metadata and a supersession flag |
 
 Schemas are provisioned by `db/init/01-init.sh`. `dbt/macros/schema_routing.sql`
 pins models to exactly `silver` and `gold` and suppresses dbt's own
@@ -192,6 +197,104 @@ dbt test --project-dir dbt --profiles-dir dbt
 
 The bronze ingestion tests are unaffected: `pytest tests/ingestion`.
 
+## 7. Extract passages and build gold retrieval data
+
+The document branch mirrors the financial branch but runs in four steps, because
+dbt cannot parse HTML or compute embeddings:
+
+1. **Extract** (`extraction/`, Python): read the stored filing HTML from bronze
+   and write raw, heading-aware passages to `bronze.filing_documents` and
+   `bronze.document_blocks`.
+2. **Validate to silver** (dbt): build and test `silver.filings` and
+   `silver.passages` (plus their quarantine tables).
+3. **Embed** (`embeddings/`, Python): read `silver.passages` and write
+   `silver.passage_embeddings`.
+4. **Build and check gold** (dbt): build and test `gold.retrieval_passages`.
+
+```sh
+set -a; . ./.env; set +a
+export DBT_ALLOW_EXPERIMENTAL_ADAPTERS=true
+
+docker compose exec app python -m extraction
+dbt build --select silver --indirect-selection cautious --project-dir dbt --profiles-dir dbt
+docker compose exec app python -m embeddings
+dbt build --project-dir dbt --profiles-dir dbt
+```
+
+The `--indirect-selection cautious` on the silver step keeps cross-layer tests
+(which reference not-yet-built gold) out of that build; the final full `dbt build`
+runs them once gold exists. With Podman, substitute `podman-compose exec app` and
+`podman-compose`, as above.
+The `app` image now installs `sentence-transformers` (and its CPU PyTorch
+dependency) on first start, so the first `up` takes longer and needs network; the
+model weights are downloaded and cached on first embedding run.
+The embedding step must run between the silver and gold builds: gold joins each
+silver passage to its vector, and the full build fails if any passage still lacks
+one for the pinned model (`retrieval_passages_covers_all_passages`), so partial
+retrieval data is never accepted.
+
+### Extraction and retrieval selection
+
+- Extraction walks block elements in document order, tracks the nearest
+  `Item N.` / `PART N` heading as the passage's `section`, renders each whole
+  table as row text (`a | b ; c | d`, including div/p-wrapped cells, preserving
+  empty-cell positions and rendering nested rows once), and groups blocks into
+  passages of at most 1500 characters (the joining spaces count toward the
+  bound). Each passage's hash covers its text, section, and the processing
+  version, so a re-extraction is idempotent and a new version is stored alongside
+  the old rows. Text held directly in mixed-content containers (a block that also
+  holds nested blocks) is not emitted; SEC prose and tables render as leaf blocks,
+  so coverage is high.
+- Only the active extraction version is served: `dbt/dbt_project.yml`
+  `active_processing_version` (matching `extraction.PROCESSING_VERSION`) filters
+  `gold.retrieval_passages` and the search, and embeddings are generated only for
+  it. Older processing versions stay in bronze/silver for lineage but are never
+  in default results, so a parser upgrade does not leave damaged text in serving.
+  Bump the version when the parser changes.
+- A stored document that yields no usable text records `extraction_error`
+  (`no_usable_text`) in `bronze.filing_documents` and quarantines as a filing;
+  it is never counted as a successful, evidence-free filing.
+- Accession metadata is merged from every preserved submissions/history snapshot
+  (NULL, empty, and whitespace-only newer fields count as missing and never erase
+  a known value), so an older report whose accession has aged out of the newest
+  `filings.recent` list keeps its form and dates. Filing company/accession are
+  validated against `bronze.manifest`, and passage company/accession against the
+  cited filing; inconsistent rows quarantine (`cik_manifest_mismatch`,
+  `accession_manifest_mismatch`, `cik_mismatch`, `accession_mismatch`).
+- `gold.retrieval_passages` is built only from validated silver passages joined
+  to `silver.passage_embeddings`. A filing is flagged `is_superseded` when a
+  later-filed 10-K or 10-K/A exists for the same `(cik, report_date)`; superseded
+  passages stay in silver and in gold, and default retrieval filters
+  `is_superseded = false`. Empty results must not be treated as no evidence
+  without checking this flag.
+- Vectors come from `sentence-transformers/all-MiniLM-L6-v2` (384 dimensions,
+  L2-normalized). `embeddings/` reuses a stored vector when
+  `(passage_hash, processing_version, model_version)` already match, so a rerun
+  re-embeds nothing; the model version and dimension are pinned in
+  `dbt/dbt_project.yml` and checked by `dbt/tests/retrieval_passages_dimension.sql`.
+
+### Search published gold passages
+
+`embeddings/search.py` embeds a question with the same model and runs one
+parameterized exact nearest-neighbor query against `gold.retrieval_passages`
+only. It filters by company and/or accession and, by default, excludes
+superseded filings and serves only the active processing version; it returns the
+carried citation metadata and the full bounded passage text (the CLI prints a
+short preview of that text).
+
+```sh
+docker compose exec app python -m embeddings.search \
+  "how did revenue change and why?" --cik 320193 --limit 5
+# add --include-superseded to search amended/superseded filings too
+```
+
+```sh
+docker compose exec postgres psql -U sec_admin -d sec_research \
+  -c 'SELECT count(*) FROM silver.passages' \
+  -c 'SELECT is_superseded, count(*) FROM gold.retrieval_passages GROUP BY 1' \
+  -c 'SELECT count(*) FROM silver.passages_quarantine'
+```
+
 ## pgvector
 
 `db/init/01-init.sh` runs `CREATE EXTENSION vector` during database bootstrap,
@@ -227,7 +330,7 @@ API role through default privileges, without a further grant.
 MinIO removed its own public images from Docker Hub and Quay in 2025-2026. The
 defaults therefore point at Chainguard's maintained builds:
 
-```
+```text
 cgr.dev/chainguard/minio:latest
 cgr.dev/chainguard/minio-client:latest
 ```
