@@ -140,7 +140,8 @@ def answer_question(request: QuestionRequest, *, conn, company_ciks,
         request, company_ciks=company_ciks, allowed_metrics=allowed
     )
     if clarifications:
-        return QuestionResponse(status="needs_clarification", clarifications=clarifications)
+        return QuestionResponse(status="needs_clarification", clarifications=clarifications,
+                                calculations=[], passages=[])
 
     calculations: list[dict] = []
     passages: list[dict] = []
@@ -158,5 +159,7 @@ def answer_question(request: QuestionRequest, *, conn, company_ciks,
         return QuestionResponse(
             status="needs_clarification",
             clarifications=[Clarification(field=exc.field, reason=exc.reason)],
+            calculations=[], passages=[],
         )
-    return QuestionResponse(status="ok", calculations=calculations, passages=passages)
+    return QuestionResponse(status="ok", clarifications=[], calculations=calculations,
+                            passages=passages)

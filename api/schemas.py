@@ -50,6 +50,30 @@ class Clarification(BaseModel):
     reason: str
 
 
+class Citation(BaseModel):
+    """A citation resolved to application-supplied metadata/URL."""
+
+    id: str
+    kind: str
+    url: str | None = None
+    accession: str | None = None
+    section: str | None = None
+    label: str | None = None
+
+
+class Answer(BaseModel):
+    """A composed, cited answer (task T006)."""
+
+    text: str
+    citations: list[Citation] = Field(default_factory=list)
+    abstained: bool = False
+    limitations: str | None = None
+    model: str | None = None
+    usage: dict | None = None
+    latency_ms: int | None = None
+    cost_usd: float | None = None
+
+
 class NeedsClarification(Exception):
     """Raised by a tool when executing it needs an unambiguous input first.
 
@@ -68,3 +92,6 @@ class QuestionResponse(BaseModel):
     clarifications: list[Clarification] = Field(default_factory=list)
     calculations: list[dict] = Field(default_factory=list)
     passages: list[dict] = Field(default_factory=list)
+    # Composed cited answer (task T006); omitted from the response when no model
+    # is configured (H008), via response_model_exclude_unset at the route.
+    answer: Answer | None = None
