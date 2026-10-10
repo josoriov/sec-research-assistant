@@ -46,10 +46,11 @@ class SecClient:
                     time.sleep(2**attempt)
                     continue
                 raise
-            except (urllib.error.URLError, TimeoutError) as error:
+            except (urllib.error.URLError, TimeoutError):
                 # TimeoutError covers response-body read timeouts as well as
                 # connection timeouts, so large downloads still retry.
                 if attempt < retries:
                     time.sleep(2**attempt)
                     continue
                 raise
+        raise ValueError("retries must be non-negative")

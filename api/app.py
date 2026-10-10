@@ -11,7 +11,9 @@ from fastapi import FastAPI
 
 from api import db
 from api.answering import (
-    answer_question_with_citations, client_from_env, configure_logging,
+    answer_question_with_citations,
+    client_from_env,
+    configure_logging,
 )
 from api.router import company_cik_map
 from api.schemas import QuestionRequest, QuestionResponse

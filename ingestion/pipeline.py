@@ -111,7 +111,7 @@ def _download(client, store, conn, *, cik, source, accession, url):
     """
     try:
         data = client.get(url)
-    except Exception as error:  # noqa: BLE001 - record every terminal failure
+    except Exception as error:
         db.record_failure(
             conn, cik=cik, source=source, accession=accession, url=url,
             bucket=store.bucket, error=f"{type(error).__name__}: {error}",

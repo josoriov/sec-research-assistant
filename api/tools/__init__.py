@@ -9,4 +9,4 @@ from __future__ import annotations
 from api.tools import financials, passages
 from api.tools.financials import list_metrics
 
-__all__ = ["financials", "passages", "list_metrics"]
+__all__ = ["financials", "list_metrics", "passages"]

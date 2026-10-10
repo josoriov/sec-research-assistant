@@ -49,6 +49,8 @@ def test_search_passages_returns_carried_citation_metadata_and_binds_filters():
         "section": "Item 7.", "heading": "Item 7.", "url": "https://www.sec.gov/x.htm",
         "text": "revenue rose", "similarity": 0.87,
     }]
+    assert conn.sql is not None
+    assert conn.params is not None
     assert "gold.retrieval_passages" in conn.sql
     assert "silver." not in conn.sql and "bronze." not in conn.sql
     assert "p.is_superseded = false" in conn.sql
@@ -62,6 +64,7 @@ def test_search_passages_returns_carried_citation_metadata_and_binds_filters():
 def test_search_passages_leaves_periods_unrestricted_when_omitted():
     conn = RecordingConn([])
     search_passages("how did revenue change?", conn=conn, encoder=StubEncoder())
+    assert conn.params is not None
     assert conn.params["fiscal_years"] is None
     assert conn.params["cik"] is None
     assert search_passages("how did revenue change?", conn=RecordingConn([]),

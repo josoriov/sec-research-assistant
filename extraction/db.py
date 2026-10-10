@@ -6,9 +6,15 @@ from pathlib import Path
 from ingestion.db import connect  # same pipeline role/credentials as ingestion
 
 __all__ = [
-    "connect", "ensure_schema", "load_filing_manifests", "load_submission_objects",
-    "upsert_document", "replace_blocks", "count_documents", "count_blocks",
+    "connect",
+    "count_blocks",
+    "count_documents",
     "count_failures",
+    "ensure_schema",
+    "load_filing_manifests",
+    "load_submission_objects",
+    "replace_blocks",
+    "upsert_document",
 ]
 
 SCHEMA_PATH = Path(__file__).resolve().parent / "schema.sql"

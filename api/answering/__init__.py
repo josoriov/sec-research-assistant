@@ -6,13 +6,23 @@ answer. The model is an OpenAI-compatible endpoint configured through the
 environment (see docs/setup.md §9).
 """
 from api.answering.client import (
-    ChatResult, LLMError, OpenAIChatClient, client_from_env,
+    ChatResult,
+    LLMError,
+    OpenAIChatClient,
+    client_from_env,
 )
 from api.answering.compose import (
-    answer_question_with_citations, compose_answer, configure_logging,
+    answer_question_with_citations,
+    compose_answer,
+    configure_logging,
 )
 
 __all__ = [
-    "ChatResult", "LLMError", "OpenAIChatClient", "client_from_env",
-    "answer_question_with_citations", "compose_answer", "configure_logging",
+    "ChatResult",
+    "LLMError",
+    "OpenAIChatClient",
+    "answer_question_with_citations",
+    "client_from_env",
+    "compose_answer",
+    "configure_logging",
 ]

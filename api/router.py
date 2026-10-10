@@ -8,12 +8,16 @@ guessing.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Mapping
 
 from api import tools
 from api.schemas import (
-    Clarification, NeedsClarification, QuestionRequest, QuestionResponse, Tool,
+    Clarification,
+    NeedsClarification,
+    QuestionRequest,
+    QuestionResponse,
+    Tool,
 )
 
 # Only the supported decimal CIK spelling: ASCII digits. `str.isdigit()` accepts

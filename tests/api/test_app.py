@@ -3,11 +3,12 @@
 No HTTP client (decision H007): the route's handler logic is exercised directly
 through `answer_question` with a stub connection.
 """
+import pytest
+from fastapi.routing import APIRoute
+
 from api.app import app
 from api.router import answer_question
 from api.schemas import QuestionRequest
-
-import pytest
 
 CATALOG = [("net_income",), ("operating_cash_flow",), ("revenue",)]
 
@@ -42,7 +43,11 @@ def _annual_row():
 
 def test_questions_route_is_registered():
     assert any(
-        route.path == "/questions" and "POST" in route.methods for route in app.routes
+        isinstance(route, APIRoute)
+        and route.path == "/questions"
+        and route.methods is not None
+        and "POST" in route.methods
+        for route in app.routes
     )
 
 

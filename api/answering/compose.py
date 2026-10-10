@@ -62,7 +62,7 @@ def _usage(prompt_tokens, completion_tokens) -> dict:
 def _cost(prompt_tokens, completion_tokens) -> float | None:
     in_price = os.environ.get("LLM_INPUT_COST_PER_1K")
     out_price = os.environ.get("LLM_OUTPUT_COST_PER_1K")
-    if None in (in_price, out_price, prompt_tokens, completion_tokens):
+    if in_price is None or out_price is None or prompt_tokens is None or completion_tokens is None:
         return None
     try:
         return round(

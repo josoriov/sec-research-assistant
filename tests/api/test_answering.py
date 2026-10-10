@@ -8,7 +8,9 @@ import pytest
 
 from api.answering.client import ChatResult, LLMError
 from api.answering.compose import (
-    answer_question_with_citations, compose_answer, configure_logging,
+    answer_question_with_citations,
+    compose_answer,
+    configure_logging,
 )
 from api.answering.prompt import build_sources
 from api.schemas import QuestionRequest
@@ -101,7 +103,9 @@ def test_compose_answer_resolves_known_citations_and_rejects_unknown():
                             client=_ok(citations=[known, "made-up-id"]))
     assert answer.text == "Revenue rose."
     assert [c.id for c in answer.citations] == [known]
+    assert answer.citations[0].url is not None
     assert answer.citations[0].url.startswith("https://www.sec.gov/Archives/")
+    assert answer.limitations is not None
     assert "made-up-id" in answer.limitations
     assert answer.abstained is False
 
@@ -226,6 +230,7 @@ def test_refusal_abstains_with_the_refusal_reason():
     answer = compose_answer("why?", [_get_calc()], [],
                             client=FakeClient("", refusal="I cannot help with that."))
     assert answer.abstained is True
+    assert answer.limitations is not None
     assert "refused" in answer.limitations
     assert "cannot help" in answer.limitations
 
@@ -286,6 +291,7 @@ def test_answer_question_with_citations_attaches_a_cited_answer():
         conn=conn, company_ciks={"AAPL": 320193}, client=client,
     )
     assert response.status == "ok"
+    assert response.answer is not None
     assert response.answer.citations[0].kind == "metric"
     assert len(client.calls) == 1
 
@@ -339,5 +345,7 @@ def test_model_outage_keeps_the_evidence_package():
     )
     assert response.status == "ok"
     assert response.calculations  # evidence preserved
+    assert response.answer is not None
     assert response.answer.abstained is True
+    assert response.answer.limitations is not None
     assert "failed" in response.answer.limitations

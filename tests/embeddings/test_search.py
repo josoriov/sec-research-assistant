@@ -48,6 +48,8 @@ def test_search_maps_hits_and_excludes_superseded_by_default():
         "heading": "Item 7.", "url": "https://www.sec.gov/x.htm",
         "text": "revenue rose", "similarity": 0.9,
     }]
+    assert conn.sql is not None
+    assert conn.params is not None
     assert "gold.retrieval_passages" in conn.sql
     assert "p.is_superseded = false" in conn.sql
     assert "<=>" in conn.sql
@@ -70,6 +72,8 @@ def test_search_filters_by_company_and_accession():
     conn = FakeConn([])
     search("how did revenue change?", encoder=FakeEncoder(), conn=conn,
            cik=320193, accession="0000320193-25-000079")
+    assert conn.sql is not None
+    assert conn.params is not None
     assert "p.cik = %s" in conn.sql
     assert "p.accession = %s" in conn.sql
     assert 320193 in conn.params
@@ -80,4 +84,5 @@ def test_search_can_include_superseded():
     conn = FakeConn([])
     search("how did revenue change?", encoder=FakeEncoder(), conn=conn,
            include_superseded=True)
+    assert conn.sql is not None
     assert "is_superseded" not in conn.sql

@@ -41,9 +41,9 @@ def _metric_row(value, fiscal_year=2024, is_ambiguous=False):
             value, is_ambiguous, 1, 2, "0000320193-24-000123", "10-K", "2024-11-01")
 
 
-def _compare_row(value_a=100.0, value_b=150.0, *, amb_a=False, amb_b=False,
+def _compare_row(value_a: float | None = 100.0, value_b: float | None = 150.0, *, amb_a=False, amb_b=False,
                  count_a=1, count_b=1, periods_a=None, periods_b=None):
-    if value_a in (None, 0) or value_b is None:
+    if value_a is None or value_a == 0 or value_b is None:
         change_percent = None
     else:
         change_percent = (value_b - value_a) / value_a
@@ -68,6 +68,7 @@ def test_get_metric_binds_values_and_never_interpolates_them():
     assert result["values"][0]["value"] == 391035000000.0
     assert result["values"][0]["period_end"] == "2024-09-28"
     assert result["notes"] == []
+    assert conn.sql is not None
     assert "gold.annual_metrics" in conn.sql
     assert "%(cik)s" in conn.sql and "%(fiscal_years)s" in conn.sql
     assert "320193" not in conn.sql
@@ -80,6 +81,7 @@ def test_get_metric_reports_missing_requested_years_and_ambiguity():
     result = get_metric(conn, cik=320193, metric="revenue", fiscal_years=[2020, 2024])
     assert result["notes"][0] == "no annual value for fiscal_year=2020"
     assert any("ambiguous" in note for note in result["notes"])
+    assert conn.params is not None
     assert conn.params["fiscal_years"] == [2020, 2024]
 
 
@@ -94,6 +96,7 @@ def test_compare_periods_uses_sql_change_and_carries_provenance():
     assert result["source_a"]["accession"] == "acc-2023"
     assert result["source_b"]["accession"] == "acc-2024"
     assert result["source_a"]["period_end"] == "2023-09-30"
+    assert conn.sql is not None
     assert "gold.annual_metrics" in conn.sql
     assert "320193" not in conn.sql and "2023" not in conn.sql
     assert conn.params == {"cik": 320193, "metric": "revenue", "unit": "USD",

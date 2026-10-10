@@ -8,6 +8,7 @@ offline suite is unaffected. They never write to the database.
 """
 from __future__ import annotations
 
+import psycopg
 import pytest
 
 from api import db
@@ -18,7 +19,7 @@ from api.tools.financials import compare_periods, get_metric
 def _connect():
     try:
         return db.connect()
-    except Exception as exc:  # missing credentials or database unreachable
+    except (KeyError, psycopg.OperationalError) as exc:
         pytest.skip(f"no live gold database: {exc}")
 
 

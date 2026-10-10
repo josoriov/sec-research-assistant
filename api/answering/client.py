@@ -13,6 +13,7 @@ import os
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+from typing import NoReturn
 
 DEFAULT_BASE_URL = "https://api.openai.com/v1"
 
@@ -96,12 +97,16 @@ class OpenAIChatClient:
         if not isinstance(payload, dict):
             raise LLMError("malformed chat completion response", model=self.model)
         # Extract safe metadata first so a rejected envelope is still attributable.
-        model = payload.get("model") if isinstance(payload.get("model"), str) else self.model
-        usage = payload.get("usage") if isinstance(payload.get("usage"), dict) else {}
+        model = payload.get("model")
+        if not isinstance(model, str):
+            model = self.model
+        usage = payload.get("usage")
+        if not isinstance(usage, dict):
+            usage = {}
         prompt_tokens = _as_token(usage.get("prompt_tokens"))
         completion_tokens = _as_token(usage.get("completion_tokens"))
 
-        def fail(message):
+        def fail(message) -> NoReturn:
             raise LLMError(message, model=model, prompt_tokens=prompt_tokens,
                            completion_tokens=completion_tokens)
 

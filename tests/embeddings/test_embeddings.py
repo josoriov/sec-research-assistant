@@ -3,14 +3,31 @@
 No model is loaded (a stub encoder is injected) and no database is touched, so
 these run offline and fast.
 """
+import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
-from embeddings.encoder import EMBEDDING_DIM, MODEL_NAME
+from embeddings.encoder import EMBEDDING_DIM, MODEL_NAME, SentenceTransformerEncoder
 from embeddings.pipeline import (
-    embedding_input, select_missing, to_vector_literal, verify_complete,
+    embedding_input,
+    select_missing,
+    to_vector_literal,
+    verify_complete,
 )
+
+
+@pytest.mark.parametrize("dimension", [EMBEDDING_DIM, None])
+def test_encoder_requires_a_known_dimension(monkeypatch, dimension):
+    model = SimpleNamespace(get_sentence_embedding_dimension=lambda: dimension)
+    monkeypatch.setitem(sys.modules, "sentence_transformers",
+                        SimpleNamespace(SentenceTransformer=lambda name: model))
+    if dimension is None:
+        with pytest.raises(ValueError, match="does not report its dimension"):
+            SentenceTransformerEncoder()
+    else:
+        assert SentenceTransformerEncoder().dim == dimension
 
 
 def test_select_missing_reuses_matching_content_version():

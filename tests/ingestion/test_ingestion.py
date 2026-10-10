@@ -1,12 +1,20 @@
 """Focused tests for bronze ingestion (no network, database, or MinIO needed)."""
 import json
 import urllib.error
+from email.message import Message
 
 import pytest
 from minio.error import S3Error
+from urllib3.response import HTTPResponse
 
 from ingestion import db, pipeline
-from ingestion.pipeline import _download, _original_years, filing_records, load_mapping, select_10ks
+from ingestion.pipeline import (
+    _download,
+    _original_years,
+    filing_records,
+    load_mapping,
+    select_10ks,
+)
 from ingestion.sec_client import SecClient
 from ingestion.storage import BronzeStore, object_key
 
@@ -38,7 +46,7 @@ class FakeMinio:
 
     def stat_object(self, bucket, key):
         if (bucket, key) not in self.objects:
-            raise S3Error(None, "NoSuchKey", "missing", key, "req", "host")
+            raise S3Error(HTTPResponse(status=404), "NoSuchKey", "missing", key, "req", "host")
 
     def put_object(self, bucket, key, data, length, content_type):
         self.objects[(bucket, key)] = data.read()
@@ -97,13 +105,22 @@ def test_client_requires_identifying_user_agent():
         SecClient("no-contact-here")
 
 
+def test_client_rejects_negative_retries_without_a_request():
+    def opener(request, timeout=None):
+        pytest.fail("negative retries must not make a request")
+
+    client = SecClient("bot you@example.com", min_interval=0, opener=opener)
+    with pytest.raises(ValueError, match="retries must be non-negative"):
+        client.get("https://example.test/f", retries=-1)
+
+
 def test_client_retries_temporary_http_errors(monkeypatch):
     calls = []
 
     def opener(request, timeout=None):
         calls.append(request.full_url)
         if len(calls) == 1:
-            raise urllib.error.HTTPError(request.full_url, 503, "busy", {}, None)
+            raise urllib.error.HTTPError(request.full_url, 503, "busy", Message(), None)
         return _Response(b"ok")
 
     monkeypatch.setattr("ingestion.sec_client.time.sleep", lambda seconds: None)
@@ -256,7 +273,7 @@ def test_download_records_exhausted_failure_and_reraises(monkeypatch):
 
     class AlwaysFailing:
         def get(self, url, **kwargs):
-            raise urllib.error.HTTPError(url, 503, "busy", {}, None)
+            raise urllib.error.HTTPError(url, 503, "busy", Message(), None)
 
     monkeypatch.setattr(pipeline.db, "record_failure", fake_record_failure)
     store = BronzeStore(FakeMinio(), "bronze")
@@ -315,7 +332,7 @@ def test_run_fails_when_required_report_download_fails(monkeypatch):
                 return b'{"facts": {}}'
             if url.endswith("submissions/CIK0000320193.json"):
                 return json.dumps(submissions).encode()
-            raise urllib.error.HTTPError(url, 503, "busy", {}, None)
+            raise urllib.error.HTTPError(url, 503, "busy", Message(), None)
 
     class FakeStore:
         bucket = "bronze"

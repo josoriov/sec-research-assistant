@@ -36,6 +36,7 @@ def test_client_from_env_is_none_without_a_model_or_endpoint():
 
 def test_client_from_env_uses_default_openai_base_url_with_key():
     client = client_from_env({"LLM_MODEL": "gpt-4o-mini", "LLM_API_KEY": "sk-test"})
+    assert client is not None
     assert client.base_url == "https://api.openai.com/v1"
     assert client.api_key == "sk-test"
     assert client.model == "gpt-4o-mini"
@@ -45,6 +46,7 @@ def test_client_from_env_allows_a_local_server_without_a_key():
     client = client_from_env(
         {"LLM_MODEL": "llama3", "LLM_BASE_URL": "http://localhost:11434/v1"}
     )
+    assert client is not None
     assert client.base_url == "http://localhost:11434/v1"
     assert client.api_key is None
 
@@ -160,7 +162,7 @@ def test_redirect_does_not_forward_the_bearer_to_another_origin():
         do_POST = _record
         do_GET = _record
 
-        def log_message(self, *args):
+        def log_message(self, format, *args):
             pass
 
     destination = _serve(Destination)
@@ -174,7 +176,7 @@ def test_redirect_does_not_forward_the_bearer_to_another_origin():
             )
             self.end_headers()
 
-        def log_message(self, *args):
+        def log_message(self, format, *args):
             pass
 
     redirector = _serve(Redirector)

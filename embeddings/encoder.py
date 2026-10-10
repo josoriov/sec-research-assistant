@@ -17,7 +17,10 @@ class SentenceTransformerEncoder:
 
         self._model = SentenceTransformer(model_name)
         self.model_version = model_name
-        self.dim = int(self._model.get_sentence_embedding_dimension())
+        dimension = self._model.get_sentence_embedding_dimension()
+        if dimension is None:
+            raise ValueError("embedding model does not report its dimension")
+        self.dim = dimension
 
     def encode(self, texts: list[str]) -> list[list[float]]:
         vectors = self._model.encode(list(texts), normalize_embeddings=True)
