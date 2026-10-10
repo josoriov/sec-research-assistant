@@ -295,6 +295,182 @@ docker compose exec postgres psql -U sec_admin -d sec_research \
   -c 'SELECT count(*) FROM silver.passages_quarantine'
 ```
 
+## 8. Ask questions (FastAPI)
+
+`api/` serves `POST /questions` over the published gold datasets only. It
+connects with the read-only `GOLD_API_DB_USER` role, so the database — not just
+the application — denies access to `silver` and `bronze`. Routing is
+deterministic (decision H007): the request is resolved and validated, then mapped
+to the approved tools. No language model selects the tool or writes SQL here;
+LLM answer composition is a later task (T006).
+
+Run the API (it uses the same `.env` as the rest of the stack):
+
+```sh
+# On the host, with requirements installed and PGHOST/PGPORT pointed at the
+# published Postgres port (POSTGRES_PORT):
+set -a; . ./.env; set +a
+PGHOST=localhost PGPORT="$POSTGRES_PORT" python -m api    # 127.0.0.1:8000
+
+# Or inside the app container (Compose env already sets PGDATABASE/PGHOST):
+docker compose exec app python -m api
+```
+
+`API_HOST` and `API_PORT` override the bind address (defaults `127.0.0.1:8000`).
+The app service does not publish a port; exposing it to the host is outside T005,
+so run the API on the host (as above) or reach it from inside the Compose
+network.
+
+### Request
+
+```jsonc
+POST /questions
+{
+  "company": "AAPL",          // ticker or numeric CIK (≤10 digits; required)
+  "metric": "revenue",        // revenue | net_income | operating_cash_flow
+  "fiscal_years": [2023, 2024], // one year for a value, two to compare
+  "question": "why did revenue change?", // optional; retrieves passages
+  "tool": "compare_periods",  // optional; inferred otherwise
+  "limit": 5,                 // passages to return (1–20)
+  "include_superseded": false // include superseded filings
+}
+```
+
+The tool is inferred when omitted: a metric with two fiscal years compares them,
+a metric alone (or with one year) reads values, and a `question` searches
+passages. Both a metric and a question run both tools. `fiscal_years` are bounded
+to 1900–2100; structurally invalid input returns HTTP 422. When `fiscal_years`
+is supplied, passage retrieval is restricted to filings whose report date falls
+in those years, so a FY2023 request cannot return a FY2025 passage.
+
+### Response
+
+`status` is `ok` with an evidence package, or `needs_clarification` with the
+fields the client must resolve:
+
+```jsonc
+{ "status": "needs_clarification",
+  "clarifications": [{"field": "company", "reason": "unknown company 'MSFT'"}],
+  "calculations": [], "passages": [] }
+```
+
+```jsonc
+{ "status": "ok",
+  "calculations": [{
+    "tool": "compare_periods", "cik": 320193, "metric": "revenue", "unit": "USD",
+    "year_a": 2023, "year_b": 2024,
+    "value_a": 383285000000.0, "value_b": 391035000000.0,
+    "source_a": {"period_start": "2022-10-01", "period_end": "2023-09-30",
+                  "is_ambiguous": false, "source_fact_id": 1, "manifest_id": 2,
+                  "accession": "0000320193-23-000106", "form": "10-K",
+                  "filed_date": "2023-11-03"},
+    "source_b": {"period_start": "2023-10-01", "period_end": "2024-09-28",
+                  "is_ambiguous": false, "accession": "0000320193-24-000123", "…": "…"},
+    "change_absolute": 7750000000.0, "change_percent": 0.0202,
+    "notes": []   // missing year, zero-base, or ambiguous-input notes
+  }],
+  "passages": [{ "passage_id": 12, "cik": 320193, "accession": "0000320193-24-000123",
+                 "section": "Item 8.", "heading": "Item 8.", "url": "https://…",
+                 "text": "…", "similarity": 0.72 }] }
+```
+
+When a requested fiscal year matches more than one eligible annual period
+(gold's grain is the period, not the year label), the API returns
+`needs_clarification` naming the candidate periods instead of guessing; the
+comparison carries each side's gold source and flags an ambiguous (restated or
+conflicting) input in `notes`.
+
+```sh
+curl -s localhost:8000/questions -H 'content-type: application/json' -d '{
+  "company": "AAPL", "metric": "revenue", "fiscal_years": [2023, 2024],
+  "question": "why did revenue change?"}'
+```
+
+- `GET /health` returns `{"status": "ok"}`.
+- Metric queries run parameterized SQL templates from `sql/` against
+  `gold.annual_metrics`; changes are computed in SQL, and missing periods, a
+  zero base, and ambiguous inputs are reported in `notes`.
+- Passage evidence comes from `gold.retrieval_passages` using the citation
+  metadata carried there (parameterized exact search, restricted to the
+  requested company and report years; superseded filings excluded by default).
+- Run the API tests with `pytest tests/api`. The live-database regressions in
+  `tests/api/test_gold_integration.py` run only when the gold database is
+  reachable with the API credentials and otherwise skip.
+- When a language model is configured, an `answer` object is added to `ok`
+  responses (section 9); otherwise the response is exactly as above.
+
+## 9. Compose cited answers (LLM)
+
+T006 sends the T005 evidence package to an OpenAI-compatible chat model and
+attaches a cited `answer` to the `POST /questions` response. No SDK is used: the
+client is a standard-library `urllib` call to `<LLM_BASE_URL>/chat/completions`,
+so the project adds no dependency and works with OpenAI, a compatible gateway, or
+a local server (Ollama/LM Studio/vLLM).
+
+Configuration (`.env`):
+
+| Variable | Purpose |
+| --- | --- |
+| `LLM_MODEL` | Model name; answer composition is enabled only when this is set. |
+| `LLM_BASE_URL` | Endpoint base (default `https://api.openai.com/v1`). |
+| `LLM_API_KEY` | Bearer token for a hosted provider; omit it for a local server with an explicit base URL. |
+| `LLM_INPUT_COST_PER_1K` / `LLM_OUTPUT_COST_PER_1K` | Optional USD per-1K-token prices; cost is logged as `null` when unset. |
+
+```sh
+set -a; . ./.env; set +a
+python -m api
+```
+
+When configured, each `ok` response gains an `answer` object; the T005
+`calculations`/`passages` are unchanged:
+
+```jsonc
+{ "status": "ok",
+  "calculations": [ /* … */ ], "passages": [ /* … */ ],
+  "answer": {
+    "text": "Revenue rose 2.0%, driven by Services.",
+    "citations": [
+      {"id": "metric:320193:revenue:2023-10-01:2024-09-28", "kind": "metric",
+       "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/",
+       "accession": "0000320193-24-000123", "section": null,
+       "label": "revenue (2023-10-01 to 2024-09-28)"},
+      {"id": "passage:12", "kind": "passage", "url": "https://…/aapl-20240928.htm",
+       "accession": "0000320193-24-000123", "section": "Item 7.", "label": "Item 7."}
+    ],
+    "abstained": false, "limitations": null, "model": "gpt-4o-mini",
+    "usage": {"prompt_tokens": 1234, "completion_tokens": 88},
+    "latency_ms": 812, "cost_usd": null
+  } }
+```
+
+- Source ids are stable and content-based
+  (`metric:<cik>:<metric>:<period_start>:<period_end>` and `passage:<passage_id>`;
+  the full period distinguishes two annual periods that share an end date). The
+  model cites ids and the API maps each to its own URL/section. Citation ids that
+  were not supplied are rejected and noted in `limitations`.
+- Passage text is presented as untrusted data, with an instruction to ignore any
+  instruction inside it (prompt injection is treated as data). The model's
+  internal URL/section fields are ignored; citations come only from the app.
+- The model is told to distinguish reported explanations from inference and to
+  set `abstained` (with `limitations`) for missing or conflicting evidence.
+  `GET /health` reports `answer_composition` true/false.
+- Redirects from the completion endpoint are refused, so the API key is never
+  sent to another origin.
+- Malformed, empty, non-JSON, or refused model replies become an abstained
+  `answer` with a limitation — never an error or a false success. A request with
+  no evidence abstains without calling the model; a model outage keeps the
+  evidence package and marks the answer abstained.
+- Usage, latency, and cost are logged as structured fields by the `api.answering`
+  logger (configured at app startup so it emits under Uvicorn); credentials and
+  prompt/document text are never logged.
+- With no model configured (no `LLM_MODEL`), the `answer` field is omitted and
+  the endpoint returns exactly the section 8 response shape.
+- Run the answer tests with `pytest tests/api`.
+
+Note: the Compose `app` service does not forward `LLM_*` (compose.yaml is
+outside T006 scope). Run `python -m api` on the host, or pass them explicitly,
+e.g. `docker compose exec -e LLM_MODEL=gpt-4o-mini app python -m api`.
+
 ## pgvector
 
 `db/init/01-init.sh` runs `CREATE EXTENSION vector` during database bootstrap,
