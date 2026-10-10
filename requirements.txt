@@ -13,3 +13,7 @@ beautifulsoup4>=4.12,<5
 # Passage embeddings (task T004): local CPU model, no API key or network at query
 # time. First use downloads the model weights (cached by sentence-transformers).
 sentence-transformers>=3,<4
+
+# Question API (task T005): FastAPI app; uvicorn runs the ASGI server.
+fastapi>=0.115,<1
+uvicorn>=0.30,<1
