@@ -49,6 +49,8 @@ commands below work with either engine; substitute `podman-compose` for
 | `minio` | Chainguard MinIO | S3-compatible archive; holds the `bronze/` bucket. |
 | `minio-init` | Chainguard `mc` client | One-shot: creates the `bronze` bucket, then exits. |
 | `app` | `python:3.12-slim` | Python pipeline. Installs `requirements.txt` from the repo mount at start, then idles so commands can be run with `docker compose exec` (no Dockerfile yet). |
+| `airflow-db-init` | `postgres:16` | One-shot: creates the `airflow` metadata database if missing, then exits. |
+| `airflow` | Airflow image (`airflow/Dockerfile`) | Airflow 3 pipeline scheduler/UI (section 10). Installs the pipeline dependencies and `dbt-postgres`; the repo is mounted read-only. |
 
 `postgres` and `minio` write to the named volumes `pgdata` and `minio-data`, so
 database contents and downloaded files survive `docker compose restart` and
@@ -183,8 +185,10 @@ they quarantine instead of aborting the build. `dbt/models/**/schema.yml`
 and `dbt/tests/` assert required fields, grain uniqueness, the unit/period/annual
 guards, every record's bronze and silver references, and staging/gold
 regressions run the same macros the models use. A candidate is accepted only once
-these checks pass; publishing gold atomically so a failed build leaves the
-previous dataset available is task T007.
+these checks pass; the Airflow DAG (section 10) builds these models under an
+`__candidate` alias and publishes them atomically, so a failed build leaves the
+previous gold dataset served. A manual `dbt build` at this point writes the
+served gold relations directly.
 
 Inspect the result and re-run the checks on their own:
 
@@ -470,6 +474,117 @@ When configured, each `ok` response gains an `answer` object; the T005
 Note: the Compose `app` service does not forward `LLM_*` (compose.yaml is
 outside T006 scope). Run `python -m api` on the host, or pass them explicitly,
 e.g. `docker compose exec -e LLM_MODEL=gpt-4o-mini app python -m api`.
+
+## 10. Schedule the pipeline (Airflow)
+
+T007 wraps the manual stages in an Airflow DAG that runs both medallion branches
+and publishes gold atomically. Airflow runs as a Compose service built from
+`airflow/Dockerfile`; the pipeline dependencies from `requirements.txt` and
+`dbt-postgres` are installed in that image. The host keeps dbt Fusion for the
+manual commands above (decision H009), while the DAG uses dbt-core in the
+container. The repo is mounted read-only, so dbt writes its `target/` and
+`logs/` under `/tmp` inside the container.
+
+Start it:
+
+```sh
+docker compose up -d airflow      # or: podman-compose up -d airflow
+```
+
+`airflow-db-init` creates a dedicated `airflow` metadata database in the
+existing PostgreSQL (idempotent, so it also covers volumes initialized earlier),
+and `airflow` runs `airflow db migrate` then `airflow standalone` (scheduler, DAG
+processor, API server, and triggerer). The metadata connection URL is built with
+percent-encoded credentials by `airflow/bin/airflow`, which wraps the CLI on
+`PATH`, so a database password containing `@`, `:`, `%`, or a space works and the
+same wrapper backs `docker compose exec airflow ...`. Once it is up, confirm the
+DAG parsed:
+
+```sh
+docker compose exec airflow airflow dags list
+docker compose exec airflow airflow dags list-import-errors
+```
+
+### The DAG
+
+`airflow/dags/sec_research_pipeline.py` runs one linear graph; both branches feed
+the same silver and gold builds:
+
+| Task | Step |
+| --- | --- |
+| `ingest_bronze` | `python -m ingestion --company AAPL --years 3` (skipped when `skip_ingestion=true`) |
+| `extract_documents` | `python -m extraction` (bronze filing HTML → bronze blocks) |
+| `build_silver` | `dbt build --select silver --indirect-selection cautious` |
+| `embed_passages` | `python -m embeddings` |
+| `build_gold_candidate` | `dbt build --select gold --vars '{gold_candidate_suffix: __candidate}'` |
+| `publish_gold` | atomic swap of the candidates into `gold` (below) |
+
+Retries are configured (`default_args.retries = 2`), and each task's command
+output and any failure appear in the Airflow task logs. Tasks exchange only small
+summaries (row counts), never documents.
+
+### Atomic publication
+
+The three gold models build under an `__candidate` alias **in the same `gold`
+schema**, and their tests run against the candidates. `publish_gold`
+(`airflow_pipeline.py`) then swaps each `gold.<name>__candidate` into
+`gold.<name>` inside one PostgreSQL transaction (drop the served relation,
+rename the candidate into its place, grant SELECT on the served table, count the
+rows). Consequences:
+
+- A failed build or test never runs the swap, so the previous gold publication
+  stays served by the API.
+- A crash or error during the swap — including a count query — rolls the whole
+  transaction back and leaves the previous publication in place.
+- The API role cannot read candidates: `db/init` grants the API role SELECT on
+  every gold table the pipeline creates, so each gold model's post-hook revokes
+  that grant on its candidate at creation time, and `publish_gold` grants SELECT
+  back on the newly served tables in the same transaction. `gold_api` therefore
+  only ever reads published data.
+- `embeddings/search.py` and the API keep reading `gold.annual_metrics` /
+  `gold.retrieval_passages` unchanged.
+
+Only the DAG publishes atomically; a manual `dbt build` (section 6) writes the
+served relations directly.
+
+### Demo scenarios
+
+Run the DAG synchronously to see the task logs, or trigger it normally:
+
+```sh
+docker compose exec airflow airflow dags test sec_research_pipeline
+docker compose exec airflow airflow dags trigger sec_research_pipeline
+```
+
+- **Duplicate rerun:** run it twice. Ingestion is idempotent (no new objects or
+  facts) and the rebuilt gold is identical, so a rerun adds and changes nothing.
+- **Bronze-only rebuild:** rebuild silver and gold from preserved bronze with no
+  SEC downloads:
+
+  ```sh
+  docker compose exec airflow airflow dags test sec_research_pipeline \
+    -c '{"skip_ingestion": true}'
+  ```
+
+- **Recovery from download failures:** an exhausted SEC download is recorded as a
+  `failed` `bronze.manifest` row and the `ingest_bronze` task fails after its
+  retries; a later run marks the row `resolved` and stores the missing object.
+  Inspect with
+  `SELECT source, status, error FROM bronze.manifest WHERE status <> 'stored'`.
+- **Recovery from validation failures:** if a gold test fails,
+  `build_gold_candidate` fails, `publish_gold` does not run, and the API keeps
+  serving the previous gold. Fixing the input and rerunning publishes the new
+  candidate.
+
+Inspect the published gold (no `__candidate` rows should remain):
+
+```sh
+docker compose exec postgres psql -U sec_admin -d sec_research \
+  -c "SELECT tablename FROM pg_tables WHERE schemaname='gold' ORDER BY 1"
+```
+
+The Airflow UI is not published to the host by default (like the app service);
+trigger runs from the CLI as above, or add a port mapping in a local override.
 
 ## pgvector
 
