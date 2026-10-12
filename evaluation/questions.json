@@ -1,0 +1,108 @@
+{
+  "meta": {
+    "frozen": "2026-10-12",
+    "ground_truth": "Values and accessions read from published gold (gold.annual_metrics / gold.retrieval_passages) on 2026-10-12 and hand-checked against the 10-K comparatives.",
+    "companies": ["AAPL", "MSFT", "GOOGL", "AMZN", "META"]
+  },
+  "questions": [
+    {"id": "Q01", "category": "numerical",
+     "request": {"company": "AAPL", "metric": "revenue", "fiscal_years": [2024, 2025]},
+     "expect": {"metric": "revenue", "unit": "USD", "year_a": 2024, "year_b": 2025, "value_a": 391035000000, "value_b": 416161000000}},
+
+    {"id": "Q02", "category": "numerical",
+     "request": {"company": "AAPL", "metric": "net_income", "fiscal_years": [2023, 2024]},
+     "expect": {"metric": "net_income", "unit": "USD", "year_a": 2023, "year_b": 2024, "value_a": 96995000000, "value_b": 93736000000}},
+
+    {"id": "Q03", "category": "numerical",
+     "request": {"company": "AAPL", "metric": "operating_cash_flow", "fiscal_years": [2024, 2025]},
+     "expect": {"metric": "operating_cash_flow", "unit": "USD", "year_a": 2024, "year_b": 2025, "value_a": 118254000000, "value_b": 111482000000}},
+
+    {"id": "Q04", "category": "numerical",
+     "request": {"company": "MSFT", "metric": "revenue", "fiscal_years": [2024, 2025]},
+     "expect": {"metric": "revenue", "unit": "USD", "year_a": 2024, "year_b": 2025, "value_a": 245122000000, "value_b": 281724000000}},
+
+    {"id": "Q05", "category": "numerical",
+     "request": {"company": "MSFT", "metric": "net_income", "fiscal_years": [2025, 2026]},
+     "expect": {"metric": "net_income", "unit": "USD", "year_a": 2025, "year_b": 2026, "value_a": 101832000000, "value_b": 133749000000}},
+
+    {"id": "Q06", "category": "numerical",
+     "request": {"company": "MSFT", "metric": "operating_cash_flow", "fiscal_years": [2024, 2025]},
+     "expect": {"metric": "operating_cash_flow", "unit": "USD", "year_a": 2024, "year_b": 2025, "value_a": 118548000000, "value_b": 136162000000}},
+
+    {"id": "Q07", "category": "numerical",
+     "request": {"company": "AMZN", "metric": "revenue", "fiscal_years": [2023, 2024]},
+     "expect": {"metric": "revenue", "unit": "USD", "year_a": 2023, "year_b": 2024, "value_a": 574785000000, "value_b": 637959000000}},
+
+    {"id": "Q08", "category": "numerical",
+     "request": {"company": "AMZN", "metric": "net_income", "fiscal_years": [2024, 2025]},
+     "expect": {"metric": "net_income", "unit": "USD", "year_a": 2024, "year_b": 2025, "value_a": 59248000000, "value_b": 77670000000}},
+
+    {"id": "Q09", "category": "numerical",
+     "request": {"company": "AMZN", "metric": "operating_cash_flow", "fiscal_years": [2023, 2024]},
+     "expect": {"metric": "operating_cash_flow", "unit": "USD", "year_a": 2023, "year_b": 2024, "value_a": 84946000000, "value_b": 115877000000}},
+
+    {"id": "Q10", "category": "numerical",
+     "request": {"company": "META", "metric": "revenue", "fiscal_years": [2024, 2025]},
+     "expect": {"metric": "revenue", "unit": "USD", "year_a": 2024, "year_b": 2025, "value_a": 164501000000, "value_b": 200966000000}},
+
+    {"id": "Q11", "category": "numerical",
+     "request": {"company": "META", "metric": "operating_cash_flow", "fiscal_years": [2023, 2024]},
+     "expect": {"metric": "operating_cash_flow", "unit": "USD", "year_a": 2023, "year_b": 2024, "value_a": 71113000000, "value_b": 91328000000}},
+
+    {"id": "Q12", "category": "numerical",
+     "request": {"company": "GOOGL", "metric": "revenue", "fiscal_years": [2024, 2025]},
+     "expect": {"metric": "revenue", "unit": "USD", "year_a": 2024, "year_b": 2025, "value_a": 350018000000, "value_b": 402836000000}},
+
+    {"id": "Q13", "category": "numerical",
+     "request": {"company": "GOOGL", "metric": "net_income", "fiscal_years": [2023, 2024]},
+     "expect": {"metric": "net_income", "unit": "USD", "year_a": 2023, "year_b": 2024, "value_a": 73795000000, "value_b": 100118000000}},
+
+    {"id": "Q14", "category": "document",
+     "request": {"company": "AAPL", "question": "why did revenue change year over year?", "limit": 5},
+     "expect": {"accession": "0000320193-25-000079"}},
+
+    {"id": "Q15", "category": "document",
+     "request": {"company": "MSFT", "question": "what drove operating cash flow?", "limit": 5},
+     "expect": {"accession": "0001193125-26-323660"}},
+
+    {"id": "Q16", "category": "document",
+     "request": {"company": "AMZN", "question": "what were the main drivers of revenue growth?", "limit": 5},
+     "expect": {"accession": "0001018724-26-000004"}},
+
+    {"id": "Q17", "category": "document",
+     "request": {"company": "META", "question": "how did operating cash flow change?", "limit": 5},
+     "expect": {"accession": "0001628280-26-003942"}},
+
+    {"id": "Q18", "category": "document",
+     "request": {"company": "GOOGL", "question": "what factors affected revenue?", "limit": 5},
+     "expect": {"accession": "0001652044-26-000018"}},
+
+    {"id": "Q19", "category": "mixed",
+     "request": {"company": "AAPL", "metric": "revenue", "fiscal_years": [2024, 2025], "question": "why did revenue change?", "limit": 5},
+     "expect": {"metric": "revenue", "unit": "USD", "year_a": 2024, "year_b": 2025, "value_a": 391035000000, "value_b": 416161000000, "accession": "0000320193-25-000079"}},
+
+    {"id": "Q20", "category": "mixed",
+     "request": {"company": "MSFT", "metric": "revenue", "fiscal_years": [2025, 2026], "question": "why did revenue change?", "limit": 5},
+     "expect": {"metric": "revenue", "unit": "USD", "year_a": 2025, "year_b": 2026, "value_a": 281724000000, "value_b": 331839000000, "accession": "0001193125-26-323660"}},
+
+    {"id": "Q21", "category": "mixed",
+     "request": {"company": "AMZN", "metric": "revenue", "fiscal_years": [2024, 2025], "question": "why did revenue change?", "limit": 5},
+     "expect": {"metric": "revenue", "unit": "USD", "year_a": 2024, "year_b": 2025, "value_a": 637959000000, "value_b": 716924000000, "accession": "0001018724-26-000004"}},
+
+    {"id": "Q22", "category": "mixed",
+     "request": {"company": "GOOGL", "metric": "revenue", "fiscal_years": [2024, 2025], "question": "why did revenue change?", "limit": 5},
+     "expect": {"metric": "revenue", "unit": "USD", "year_a": 2024, "year_b": 2025, "value_a": 350018000000, "value_b": 402836000000, "accession": "0001652044-26-000018"}},
+
+    {"id": "Q23", "category": "unanswerable",
+     "request": {"company": "TSLA", "metric": "revenue", "fiscal_years": [2024]},
+     "expect": {"behavior": "needs_clarification", "field": "company"}},
+
+    {"id": "Q24", "category": "unanswerable",
+     "request": {"company": "AAPL", "metric": "gross_profit", "fiscal_years": [2024]},
+     "expect": {"behavior": "needs_clarification", "field": "metric"}},
+
+    {"id": "Q25", "category": "unanswerable",
+     "request": {"company": "AAPL", "metric": "revenue", "fiscal_years": [2010]},
+     "expect": {"behavior": "no_value"}}
+  ]
+}
