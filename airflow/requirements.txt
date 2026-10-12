@@ -1,0 +1,6 @@
+# Extra dependencies for the Airflow image only.
+#
+# dbt runs inside this container; the host keeps dbt Fusion for manual runs
+# (decision H009). dbt-core's Postgres adapter is the pip distribution, so the
+# committed main requirements.txt is left unchanged.
+dbt-postgres>=1.9,<2

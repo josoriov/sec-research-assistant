@@ -1,0 +1,14 @@
+# Keep the Airflow image build context small; only the two requirements files
+# are copied in (the repo is mounted at runtime, see airflow/Dockerfile).
+.git
+.venv
+.archify
+.dev-notes
+__pycache__
+**/__pycache__
+.pytest_cache
+.ruff_cache
+dbt/target
+dbt/logs
+dbt/dbt_packages
+.env

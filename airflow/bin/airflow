@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Every `airflow` invocation - the container command and `docker compose exec
+# airflow ...` - must talk to the metadata database with a percent-encoded
+# connection string. A raw password containing '@' (or ':', '%', space) would
+# otherwise be mis-parsed by SQLAlchemy (finding F037). The PATH in compose puts
+# this wrapper ahead of the real CLI.
+set -euo pipefail
+
+if [ -z "${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN:-}" ]; then
+    export AIRFLOW__DATABASE__SQL_ALCHEMY_CONN="$(python -m airflow_pipeline metadata-url)"
+fi
+
+exec /home/airflow/.local/bin/airflow "$@"

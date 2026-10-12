@@ -89,6 +89,82 @@ services:
     volumes:
       - .:/app
 
+  # One-shot: create the Airflow metadata database if it is missing. Idempotent,
+  # so it also covers data volumes initialized before T007 (init hooks do not
+  # rerun). Airflow metadata is kept separate from the application data.
+  airflow-db-init:
+    image: docker.io/library/postgres:16
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGUSER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        psql -h postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='airflow'" | grep -q 1 \
+          || psql -h postgres -d postgres -c 'CREATE DATABASE airflow'
+
+  # Airflow 3 (LocalExecutor) runs the T007 pipeline using the same CLIs and
+  # .env as the app service. The repo is mounted and the image already contains
+  # the pipeline dependencies plus dbt-postgres (decision H009).
+  airflow:
+    build:
+      context: .
+      dockerfile: airflow/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      airflow-db-init:
+        condition: service_completed_successfully
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/repo/airflow/dags
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+      # The metadata URL is built at startup with URL-encoded credentials (F037):
+      # compose cannot safely paste a password containing '@' into a URL.
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      # Read-only API role: the candidate post-hook revokes and the publisher
+      # grants SELECT on the served gold tables (F036).
+      GOLD_API_DB_USER: ${GOLD_API_DB_USER}
+      # dbt and Python pipeline steps reuse the stack's connection variables.
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:?set POSTGRES_DB in .env}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_PORT: "5432"
+      PIPELINE_DB_USER: ${PIPELINE_DB_USER}
+      PIPELINE_DB_PASSWORD: ${PIPELINE_DB_PASSWORD}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-bronze}
+      SEC_USER_AGENT: ${SEC_USER_AGENT:?set SEC_USER_AGENT in .env}
+      PYTHONPATH: /opt/airflow/repo
+      # The wrapper at /opt/airflow/bin/airflow builds the encoded metadata URL
+      # for the container command and for `compose exec` (F037).
+      PATH: /opt/airflow/bin:/home/airflow/.local/bin:/usr/local/bin:/usr/bin:/bin
+      # The repo is mounted read-only; keep dbt and Python artifacts writable.
+      PYTHONDONTWRITEBYTECODE: "1"
+      DBT_TARGET_PATH: /tmp/dbt-target
+      DBT_LOG_PATH: /tmp/dbt-logs
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_USER:-airflow}
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_PASSWORD:-airflow}
+    volumes:
+      - .:/opt/airflow/repo:ro
+      - airflow-logs:/opt/airflow/logs
+    command:
+      - bash
+      - -c
+      - airflow db migrate && exec airflow standalone
+
 volumes:
   pgdata:
   minio-data:
+  airflow-logs:
