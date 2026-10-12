@@ -10,7 +10,14 @@
 --   revenue              net sales / total revenues
 --   net_income           net income (loss) attributable to the company
 --   operating_cash_flow  net cash provided by operating activities
-{{ config(materialized='table') }}
+--
+-- `gold_candidate_suffix` mirrors annual_metrics so the publisher can build a
+-- consistent candidate set (see airflow/pipeline.py).
+{{ config(
+    materialized='table',
+    alias='metric_concepts' ~ var('gold_candidate_suffix', ''),
+    post_hook=revoke_candidate_api_select(),
+) }}
 
 select 'revenue' as metric, 'us-gaap' as taxonomy,
        'RevenueFromContractWithCustomerExcludingAssessedTax' as tag, 'USD' as unit
