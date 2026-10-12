@@ -1,4 +1,4 @@
-# Keep the Airflow image build context small; only the two requirements files
+# Keep the Airflow image build context small; dependencies and the CLI wrapper
 # are copied in (the repo is mounted at runtime, see airflow/Dockerfile).
 .git
 .venv

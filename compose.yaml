@@ -66,7 +66,14 @@ services:
   app:
     image: docker.io/library/python:3.12-slim
     working_dir: /app
-    command: ["sh", "-c", "pip install --no-cache-dir -q -r requirements.txt && exec sleep infinity"]
+    command:
+      - sh
+      - -c
+      - >-
+        python -m pip install --no-cache-dir -q --no-deps
+        --index-url https://download.pytorch.org/whl/cpu -r requirements-cpu.txt
+        && python -m pip install --no-cache-dir -q -r requirements.txt
+        && exec sleep infinity
     restart: unless-stopped
     depends_on:
       postgres:
@@ -110,6 +117,7 @@ services:
   # .env as the app service. The repo is mounted and the image already contains
   # the pipeline dependencies plus dbt-postgres (decision H009).
   airflow:
+    image: localhost/sec-research-assistant_airflow:cpu
     build:
       context: .
       dockerfile: airflow/Dockerfile

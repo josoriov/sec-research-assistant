@@ -14,6 +14,30 @@ from the environment; nothing secret is committed.
   `podman-compose` (`podman-compose version`).
 - Network access to pull container images on first start.
 
+### CPU Python dependencies
+
+The Airflow image and Compose `app` service install CPU-only PyTorch before the
+shared dependencies. For a local Python 3.12 virtual environment, run the same
+two steps from the repository root:
+
+```sh
+python -m pip install --no-deps --index-url https://download.pytorch.org/whl/cpu -r requirements-cpu.txt
+python -m pip install -r requirements.txt
+python -m pip check
+```
+
+`requirements-cpu.txt` pins the CPU wheel and is also a constraint included by
+`requirements.txt`, so later project installs cannot replace it with a GPU build.
+Only PyTorch is fetched from the official CPU index; its dependencies and the
+other project packages come from PyPI. Install the CPU wheel first in a fresh
+environment. The shared requirements do not install dbt; the Airflow image adds
+`airflow/requirements.txt`, while the host keeps dbt Fusion.
+
+The encoder explicitly uses CPU. To verify the package build (even on a machine
+without a GPU), check `python -c 'import torch; print(torch.version.cuda)'`:
+the CPU build prints `None`. `torch.cuda.is_available()` alone cannot distinguish
+a CPU wheel from a CUDA wheel running without a GPU.
+
 ## 1. Configure the environment
 
 ```sh
@@ -491,6 +515,10 @@ Start it:
 ```sh
 docker compose up -d airflow      # or: podman-compose up -d airflow
 ```
+
+After changing the dependency policy, rebuild with
+`docker compose build airflow` before starting a replacement container. Installing
+or removing packages in an existing container does not shrink its original image.
 
 `airflow-db-init` creates a dedicated `airflow` metadata database in the
 existing PostgreSQL (idempotent, so it also covers volumes initialized earlier),

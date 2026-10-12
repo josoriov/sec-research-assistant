@@ -1,0 +1,3 @@
+# Install this wheel first from https://download.pytorch.org/whl/cpu with --no-deps.
+# requirements.txt also uses this pin as a constraint to prevent GPU replacements.
+torch==2.14.1+cpu

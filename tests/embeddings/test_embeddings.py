@@ -21,8 +21,14 @@ from embeddings.pipeline import (
 @pytest.mark.parametrize("dimension", [EMBEDDING_DIM, None])
 def test_encoder_requires_a_known_dimension(monkeypatch, dimension):
     model = SimpleNamespace(get_sentence_embedding_dimension=lambda: dimension)
+
+    def load_model(name, *, device):
+        assert name == MODEL_NAME
+        assert device == "cpu"
+        return model
+
     monkeypatch.setitem(sys.modules, "sentence_transformers",
-                        SimpleNamespace(SentenceTransformer=lambda name: model))
+                        SimpleNamespace(SentenceTransformer=load_model))
     if dimension is None:
         with pytest.raises(ValueError, match="does not report its dimension"):
             SentenceTransformerEncoder()

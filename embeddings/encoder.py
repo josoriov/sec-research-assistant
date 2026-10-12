@@ -15,7 +15,7 @@ class SentenceTransformerEncoder:
     def __init__(self, model_name: str = MODEL_NAME):
         from sentence_transformers import SentenceTransformer
 
-        self._model = SentenceTransformer(model_name)
+        self._model = SentenceTransformer(model_name, device="cpu")
         self.model_version = model_name
         dimension = self._model.get_sentence_embedding_dimension()
         if dimension is None:

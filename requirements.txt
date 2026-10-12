@@ -3,6 +3,8 @@
 # The HTTP client uses the standard library (urllib), so no requests dependency.
 # pytest is included here because the project has a single local environment; it
 # is only needed to run the test suite.
+-c requirements-cpu.txt
+
 minio>=7.2,<8
 psycopg[binary]>=3.1,<4
 pytest>=8,<9
