@@ -160,9 +160,10 @@ database-level) `CREATE` privileges.
 Implemented in `dbt/models/gold/metric_concepts.sql` and
 `dbt/macros/annual_metrics.sql`:
 
-- **revenue** → `us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax`
-  (Apple reports this from FY2017; earlier years exist only under legacy tags
-  the MVP mapping does not include).
+- **revenue** → `us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax`,
+  or `us-gaap:Revenues` when a filing reports total revenue under that more
+  general tag (Apple reports the former from FY2017; Alphabet switched to
+  `Revenues` in its FY2025 10-K; both tags carry the same total when present).
 - **net_income** → `us-gaap:NetIncomeLoss`
 - **operating_cash_flow** → `us-gaap:NetCashProvidedByUsedInOperatingActivities`
 
@@ -585,6 +586,50 @@ docker compose exec postgres psql -U sec_admin -d sec_research \
 
 The Airflow UI is not published to the host by default (like the app service);
 trigger runs from the CLI as above, or add a port mapping in a local override.
+
+## 11. Expand and evaluate (T008)
+
+The sample scope is five companies (`ingestion/mappings/companies.json`): AAPL,
+MSFT, GOOGL, AMZN, and META. Each is ingested for its three most recent 10-K
+years and served end to end. `revenue` maps two XBRL tags (section 6), because
+Alphabet switched to `us-gaap:Revenues` in its FY2025 10-K.
+
+From a fresh checkout (stack up and `.env` sourced, as in sections 1–2), run:
+
+```sh
+set -a; . ./.env; set +a
+export DBT_ALLOW_EXPERIMENTAL_ADAPTERS=true
+
+for c in AAPL MSFT GOOGL AMZN META; do
+  docker compose exec app python -m ingestion --company "$c" --years 3
+done
+docker compose exec app python -m extraction
+dbt build --select silver --indirect-selection cautious --project-dir dbt --profiles-dir dbt
+docker compose exec app python -m embeddings
+dbt build --project-dir dbt --profiles-dir dbt
+```
+
+With Podman, substitute `podman-compose exec app`/`podman-compose`. Reruns are
+idempotent. `evaluation/smoke.sh` runs this same sequence and then the
+evaluation.
+
+### Evaluate
+
+`evaluation/run.py` runs the 25-question set in `evaluation/questions.json`
+through the real `POST /questions` endpoint (it starts the API itself), checks
+each answer against hand-checked ground truth from published gold, verifies
+gold → silver → bronze lineage and that the API role is denied the lower layers,
+and writes `evaluation/results.json` and `docs/evaluation-report.md`:
+
+```sh
+python -m evaluation.run
+```
+
+Composed-answer metrics (citation support, model latency, cost) and the
+prompt-injection case need a language model: set `LLM_MODEL` (plus
+`LLM_BASE_URL`/`LLM_API_KEY` for a hosted provider, or an explicit local
+`LLM_BASE_URL`) in `.env` first (section 9). Without a model the runner records
+those metrics as not measured rather than inventing them.
 
 ## pgvector
 
