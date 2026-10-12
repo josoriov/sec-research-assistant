@@ -30,9 +30,12 @@ def _iso(value):
 
 
 def list_metrics(conn) -> list[str]:
-    """Supported metrics, from the gold mapping (the source of truth)."""
+    """Supported metrics, from the gold mapping (the source of truth).
+
+    `distinct`: a metric may map more than one tag (revenue maps two).
+    """
     rows = conn.execute(
-        "select metric from gold.metric_concepts order by metric"
+        "select distinct metric from gold.metric_concepts order by metric"
     ).fetchall()
     return [row[0] for row in rows]
 
