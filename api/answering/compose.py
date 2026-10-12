@@ -91,6 +91,15 @@ def _loads(raw: str):
 _REQUIRED_FIELDS = ("answer", "citations", "abstained", "limitations")
 
 
+def _clean_citation(value: str) -> str:
+    """Normalize a cited id: strip whitespace and any surrounding brackets.
+
+    The prompt shows ids as ``[id]``, so models often echo the brackets; accept
+    both ``[id]`` and the bare ``id``.
+    """
+    return value.strip().strip("[]").strip()
+
+
 def _normalize_reply(result: ChatResult):
     """Return (fields, None) for a valid reply or (None, reason) otherwise.
 
@@ -112,6 +121,7 @@ def _normalize_reply(result: ChatResult):
     citations = data["citations"]
     if not isinstance(citations, list) or any(not isinstance(c, str) for c in citations):
         return None, "The model reply had malformed citations."
+    citations = [_clean_citation(c) for c in citations]
     abstained = data["abstained"]
     if not isinstance(abstained, bool):
         return None, "The model reply had a malformed abstention flag."

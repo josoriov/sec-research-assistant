@@ -107,6 +107,15 @@ def test_compose_answer_resolves_known_citations_and_rejects_unknown():
     assert answer.citations[0].url.startswith("https://www.sec.gov/Archives/")
     assert answer.limitations is not None
     assert "made-up-id" in answer.limitations
+
+
+def test_compose_answer_accepts_bracketed_citation_ids():
+    # H013: the prompt shows ids as [id], so models echo the brackets; accept both.
+    known = "metric:320193:revenue:2023-10-01:2024-09-28"
+    answer = compose_answer("why?", [_get_calc()], [_passage()],
+                            client=_ok(citations=[f"[{known}]", " [ made-up-id ] "]))
+    assert [c.id for c in answer.citations] == [known]
+    assert "made-up-id" in (answer.limitations or "")
     assert answer.abstained is False
 
 
