@@ -17,7 +17,7 @@ class SentenceTransformerEncoder:
 
         self._model = SentenceTransformer(model_name, device="cpu")
         self.model_version = model_name
-        dimension = self._model.get_sentence_embedding_dimension()
+        dimension = self._model.get_embedding_dimension()
         if dimension is None:
             raise ValueError("embedding model does not report its dimension")
         self.dim = dimension

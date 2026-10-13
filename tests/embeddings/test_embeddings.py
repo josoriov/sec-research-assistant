@@ -20,7 +20,7 @@ from embeddings.pipeline import (
 
 @pytest.mark.parametrize("dimension", [EMBEDDING_DIM, None])
 def test_encoder_requires_a_known_dimension(monkeypatch, dimension):
-    model = SimpleNamespace(get_sentence_embedding_dimension=lambda: dimension)
+    model = SimpleNamespace(get_embedding_dimension=lambda: dimension)
 
     def load_model(name, *, device):
         assert name == MODEL_NAME
