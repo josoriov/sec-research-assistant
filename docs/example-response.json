@@ -1,0 +1,151 @@
+{
+  "evaluation_date": "2026-10-12T16:48:51.943364+00:00",
+  "question_id": "Q20",
+  "request": {
+    "company": "MSFT",
+    "metric": "revenue",
+    "fiscal_years": [
+      2025,
+      2026
+    ],
+    "question": "why did revenue change?",
+    "limit": 5
+  },
+  "response": {
+    "status": "ok",
+    "clarifications": [],
+    "calculations": [
+      {
+        "tool": "compare_periods",
+        "cik": 789019,
+        "metric": "revenue",
+        "unit": "USD",
+        "year_a": 2025,
+        "year_b": 2026,
+        "value_a": 281724000000.0,
+        "value_b": 331839000000.0,
+        "source_a": {
+          "period_start": "2024-07-01",
+          "period_end": "2025-06-30",
+          "is_ambiguous": false,
+          "source_fact_id": 180263,
+          "manifest_id": 33,
+          "accession": "0001193125-26-323660",
+          "form": "10-K",
+          "filed_date": "2026-07-29"
+        },
+        "source_b": {
+          "period_start": "2025-07-01",
+          "period_end": "2026-06-30",
+          "is_ambiguous": false,
+          "source_fact_id": 180269,
+          "manifest_id": 33,
+          "accession": "0001193125-26-323660",
+          "form": "10-K",
+          "filed_date": "2026-07-29"
+        },
+        "change_absolute": 50115000000.0,
+        "change_percent": 0.1778868679984666,
+        "notes": []
+      }
+    ],
+    "passages": [
+      {
+        "passage_id": 4734,
+        "cik": 789019,
+        "accession": "0001193125-26-323660",
+        "section": "Item 8",
+        "heading": "Item 8",
+        "url": "https://www.sec.gov/Archives/edgar/data/789019/000119312526323660/msft-20260630.htm",
+        "text": "Segment revenue, cost of revenue, operating expenses, and operating income were as follows during the periods presented: (In millions) | | | | | | | | | | | | ; Year Ended June 30, | | | 2026 | | | | 2025 | | | | 2024 | ; Productivity and Business Processes | | | | | | | | | | | | ; Revenue | | $ | 139,996 | | | $ | 120,810 | | | $ | 106,820 | ; Cost of revenue | | | 25,017 | | | | 22,422 | | | | 19,611 | ; Operating expenses | | | 31,100 | | | | 28,615 | | | | 27,548 | ; Operating income | | $ | 83,879 | | | $ | 69,773 | | | $ | 59,661 | ; Intelligent Cloud | | | | | | | | | | | | ; Revenue | | $ | 137,791 | | | $ | 106,265 | | | $ | 87,464 | ; Cost of revenue | | | 57,876 | | | | 40,171 | | | | 29,611 | ; Operating expenses | | | 22,943 | | | | 21,505 | | | | 20,040 | ; Operating income | | $ | 56,972 | | | $ | 44,589 | | | $ | 37,813 | ; More Personal Computing | | | | | | | | | | | | ; Revenue | | $ | 54,052 | | | $ | 54,649 | | | $ | 50,838 | ; Cost of revenue | | | 23,481 | | | | 25,238 | | | | 24,892 | ; Operating expenses | | | 16,185 | | | | 15,245 | | | | 13,987 | ; Operating income | | $ | 14,386 | | | $ | 14,166 | | | $ | 11,959 | ; Total | | | | | | | | | | | | ; Revenue | | $ | 331,839 | | | $ | 281,724 | | | $ | 245,122 | ; Cost of revenue | | | 106,374 | | | | 87,831 | | | | 74,114 | ; Operating expenses | | | 70,228 | | | | 65,365 | | | | 61,575 | ; Operating income | | $ | 155,237 | | | $ | 128,528 | | | $ | 109,433 |",
+        "similarity": 0.5791936940195078
+      },
+      {
+        "passage_id": 5205,
+        "cik": 789019,
+        "accession": "0000950170-25-100235",
+        "section": "Item 8",
+        "heading": "Item 8",
+        "url": "https://www.sec.gov/Archives/edgar/data/789019/000095017025100235/msft-20250630.htm",
+        "text": "Item 8 Segment revenue, cost of revenue, operating expenses, and operating income were as follows during the periods presented: (In millions) | | | | | | | | | | | | ; Year Ended June 30, | | | 2025 | | | | 2024 | | | | 2023 | ; Productivity and Business Processes | | | | | | | | | | | | ; Revenue | | $ | 120,810 | | | $ | 106,820 | | | $ | 94,151 | ; Cost of revenue | | | 22,422 | | | | 19,611 | | | | 17,202 | ; Operating expenses | | | 28,615 | | | | 27,548 | | | | 26,875 | ; Operating Income | | $ | 69,773 | | | $ | 59,661 | | | $ | 50,074 | ; Intelligent Cloud | | | | | | | | | | | | ; Revenue | | $ | 106,265 | | | $ | 87,464 | | | $ | 72,944 | ; Cost of revenue | | | 40,171 | | | | 29,611 | | | | 24,109 | ; Operating expenses | | | 21,505 | | | | 20,040 | | | | 20,424 | ; Operating Income | | $ | 44,589 | | | $ | 37,813 | | | $ | 28,411 | ; More Personal Computing | | | | | | | | | | | | ; Revenue | | $ | 54,649 | | | $ | 50,838 | | | $ | 44,820 | ; Cost of revenue | | | 25,238 | | | | 24,892 | | | | 24,552 | ; Operating expenses | | | 15,245 | | | | 13,987 | | | | 10,230 | ; Operating Income | | $ | 14,166 | | | $ | 11,959 | | | $ | 10,038 | ; Total | | | | | | | | | | | | ; Revenue | | $ | 281,724 | | | $ | 245,122 | | | $ | 211,915 | ; Cost of revenue | | | 87,831 | | | | 74,114 | | | | 65,863 | ; Operating expenses | | | 65,365 | | | | 61,575 | | | | 57,529 | ; Operating Income | | $ | 128,528 | | | $ | 109,433 | | | $ | 88,523 |",
+        "similarity": 0.5553296373882785
+      },
+      {
+        "passage_id": 4746,
+        "cik": 789019,
+        "accession": "0001193125-26-323660",
+        "section": "Item 8",
+        "heading": "Item 8",
+        "url": "https://www.sec.gov/Archives/edgar/data/789019/000119312526323660/msft-20260630.htm",
+        "text": "We tested the mathematical accuracy of management's calculations of revenue and the associated timing of revenue recognized in the financial statements. 87",
+        "similarity": 0.5192181909317338
+      },
+      {
+        "passage_id": 5217,
+        "cik": 789019,
+        "accession": "0000950170-25-100235",
+        "section": "Item 8",
+        "heading": "Item 8",
+        "url": "https://www.sec.gov/Archives/edgar/data/789019/000095017025100235/msft-20250630.htm",
+        "text": "We tested the mathematical accuracy of management's calculations of revenue and the associated timing of revenue recognized in the financial statements. 87",
+        "similarity": 0.5192181909317338
+      },
+      {
+        "passage_id": 4706,
+        "cik": 789019,
+        "accession": "0001193125-26-323660",
+        "section": "Item 8",
+        "heading": "Item 8",
+        "url": "https://www.sec.gov/Archives/edgar/data/789019/000119312526323660/msft-20260630.htm",
+        "text": "Item 8 We are subject to income tax in many jurisdictions outside the U.S., some of which are currently under audit by local tax authorities. The resolution of these audits is not expected to be material to our consolidated financial statements. Our operations in Ireland remain subject to examination for tax years 2021 and thereafter . NOTE 12 \u2014 UNEARNED REVENUE Unearned revenue by segment was as follows: (In millions) | | | | | | ; June 30, | | 2026 | | | 2025 | ; Productivity and Business Processes | | $ | 57,936 | | | $ | 50,567 | ; Intelligent Cloud | | | 14,942 | | | | 14,022 | ; More Personal Computing | | | 2,834 | | | | 2,676 | ; Total | | $ | 75,712 | | | $ | 67,265 | Changes in unearned revenue were as follows: (In millions) | | | ; Year Ended June 30, 2026 | | | | ; Balance, beginning of period | | $ | 67,265 | ; Deferral of revenue | | | 194,184 | ; Recognition of unearned revenue | | | ( 185,737 | ) ; Balance, end of period | | $ | 75,712 |",
+        "similarity": 0.5119445767419187
+      }
+    ],
+    "answer": {
+      "text": "The evidence does not contain any management discussion (MD&A) explaining the cause of the revenue change, so the 'why' cannot be supported. The reported segment data decompose the $50,115 million increase as follows: Intelligent Cloud revenue rose from $106,265M to $137,791M (+$31,526M), Productivity and Business Processes rose from $120,810M to $139,996M (+$19,186M), and More Personal Computing fell from $54,649M to $54,052M (-$597M), summing to the total change from $281,724M to $331,839M. These segment figures are reported; the attribution of the increase primarily to Intelligent Cloud is arithmetic inference from that reported data, not a stated causal explanation.",
+      "citations": [
+        {
+          "id": "metric:789019:revenue:2024-07-01:2025-06-30",
+          "kind": "metric",
+          "url": "https://www.sec.gov/Archives/edgar/data/789019/000119312526323660/",
+          "accession": "0001193125-26-323660",
+          "section": null,
+          "label": "revenue (2024-07-01 to 2025-06-30)"
+        },
+        {
+          "id": "metric:789019:revenue:2025-07-01:2026-06-30",
+          "kind": "metric",
+          "url": "https://www.sec.gov/Archives/edgar/data/789019/000119312526323660/",
+          "accession": "0001193125-26-323660",
+          "section": null,
+          "label": "revenue (2025-07-01 to 2026-06-30)"
+        },
+        {
+          "id": "passage:4734",
+          "kind": "passage",
+          "url": "https://www.sec.gov/Archives/edgar/data/789019/000119312526323660/msft-20260630.htm",
+          "accession": "0001193125-26-323660",
+          "section": "Item 8",
+          "label": null
+        },
+        {
+          "id": "passage:5205",
+          "kind": "passage",
+          "url": "https://www.sec.gov/Archives/edgar/data/789019/000095017025100235/msft-20250630.htm",
+          "accession": "0000950170-25-100235",
+          "section": "Item 8",
+          "label": null
+        }
+      ],
+      "abstained": true,
+      "limitations": "Evidence provides only segment revenue tables and unearned revenue data; no narrative explanation of drivers (e.g., product/service demand, pricing, or acquisitions) is included, and no MD&A section was supplied. The segment decomposition is computed from reported figures rather than stated by the company as the reason for the change.",
+      "model": "mimo-v2.6-flash",
+      "usage": {
+        "prompt_tokens": 2636,
+        "completion_tokens": 650
+      },
+      "latency_ms": 22751,
+      "cost_usd": null
+    }
+  }
+}

@@ -1,4 +1,4 @@
-"""Silver passage embeddings and gold retrieval data (task T004)."""
+"""Extract source-linked passages from archived SEC filings."""
 
 # Active extraction version. Bump when the parser changes; dbt serves only this
 # version (see dbt_project.yml `active_processing_version`), while older versions

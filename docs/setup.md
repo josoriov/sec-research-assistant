@@ -1,8 +1,8 @@
 # Local environment setup
 
-Task T001 stands up the local stack: PostgreSQL with pgvector, MinIO object
-storage, and a placeholder for the Python application. This document is the
-setup and verification guide for that environment.
+Start with the [quickstart](run.md). This reference explains the implemented
+pipeline, manual stages, API contract, evaluation, and recovery. Planned UI and
+question interpretation work is listed in the public [roadmap](../TODO.md).
 
 The `compose.yaml` at the repository root follows the Compose specification, so
 it runs under **Docker Compose** or **Podman Compose**. Every credential is read
@@ -16,22 +16,27 @@ from the environment; nothing secret is committed.
 
 ### CPU Python dependencies
 
-The Airflow image and Compose `app` service install CPU-only PyTorch before the
-shared dependencies. For a local Python 3.12 virtual environment, run the same
+This is optional for host development and evaluation; the container quickstart
+does not require host Python. For this section, install Python 3.12 first.
+
+The API and Airflow images install CPU-only PyTorch before the locked
+shared dependencies at build time; startup never installs packages. For a local Python 3.12 virtual environment, run the same
 two steps from the repository root:
 
 ```sh
+python3.12 -m venv .venv
+. .venv/bin/activate
 python -m pip install --no-deps --index-url https://download.pytorch.org/whl/cpu -r requirements-cpu.txt
-python -m pip install -r requirements.txt
+python -m pip install -r requirements.lock
 python -m pip check
 ```
 
 `requirements-cpu.txt` pins the CPU wheel and is also a constraint included by
 `requirements.txt`, so later project installs cannot replace it with a GPU build.
-Only PyTorch is fetched from the official CPU index; its dependencies and the
-other project packages come from PyPI. Install the CPU wheel first in a fresh
-environment. The shared requirements do not install dbt; the Airflow image adds
-`airflow/requirements.txt`, while the host keeps dbt Fusion.
+Only PyTorch is installed from the official CPU index; the remaining packages
+come from PyPI. The locks target Python 3.12 on Linux x86-64. Install the CPU
+wheel first in a fresh virtual environment. dbt is installed in the Airflow
+image from `airflow/requirements.lock`; no host dbt installation is needed.
 
 The encoder explicitly uses CPU. To verify the package build (even on a machine
 without a GPU), check `python -c 'import torch; print(torch.version.cuda)'`:
@@ -41,7 +46,8 @@ a CPU wheel from a CUDA wheel running without a GPU.
 ## 1. Configure the environment
 
 ```sh
-cp .env.example .env
+test -f .env || cp .env.example .env
+chmod 600 .env
 ```
 
 Edit `.env` and replace every `change-me-*` value with a local password. `.env`
@@ -58,6 +64,7 @@ partly configured environment from starting silently.
 ## 2. Start the stack
 
 ```sh
+docker compose build app airflow
 docker compose up -d
 ```
 
@@ -72,7 +79,7 @@ commands below work with either engine; substitute `podman-compose` for
 | `postgres` | `pgvector/pgvector:pg16` | Shared database with the `bronze`, `silver`, and `gold` schemas. |
 | `minio` | Chainguard MinIO | S3-compatible archive; holds the `bronze/` bucket. |
 | `minio-init` | Chainguard `mc` client | One-shot: creates the `bronze` bucket, then exits. |
-| `app` | `python:3.12-slim` | Python pipeline. Installs `requirements.txt` from the repo mount at start, then idles so commands can be run with `docker compose exec` (no Dockerfile yet). |
+| `app` | API image (`api/Dockerfile`) | API only; non-root, read-only filesystem, no checkout mount or pipeline/storage credentials. |
 | `airflow-db-init` | `postgres:16` | One-shot: creates the `airflow` metadata database if missing, then exits. |
 | `airflow` | Airflow image (`airflow/Dockerfile`) | Airflow 3 pipeline scheduler/UI (section 10). Installs the pipeline dependencies and `dbt-postgres`; the repo is mounted read-only. |
 
@@ -92,7 +99,7 @@ COMPOSE="podman-compose" ./db/verify.sh     # Podman
 It asserts that pgvector is installed and usable, the schemas and roles exist,
 the API role is read-only and restricted to `gold`, and the configured bucket is
 reachable, and exits non-zero on the first failure. The bucket comes from the
-app service's Compose-resolved environment, including quoted `.env` values and
+Airflow service's Compose-resolved environment, including quoted `.env` values and
 shell overrides; the one-shot Python command needs no installed packages.
 Equivalent manual checks:
 
@@ -111,7 +118,7 @@ records them in `bronze.manifest` and `bronze.source_facts`. It does not write t
 silver or gold.
 
 ```sh
-docker compose exec app python -m ingestion --company AAPL --years 3
+docker compose exec -T airflow python -m ingestion --company AAPL --years 3
 ```
 
 `--years` must be positive; invalid counts fail before any network or storage access.
@@ -147,14 +154,16 @@ pytest tests/ingestion
 Silver and gold are built from persisted bronze with dbt; the models live under
 `dbt/`. Run the ingestion first (section 5) so `bronze.source_facts` has data.
 
-The dbt installed here is **dbt Fusion 2.0.6**; its PostgreSQL adapter is
-experimental, so the build command enables it. Connection details come from the
-same `.env` variables as the rest of the stack (`dbt/profiles.yml`).
+dbt-core and its PostgreSQL adapter run in the Airflow container. Connection
+details come from Compose (`dbt/profiles.yml`); the working directory is the
+repository root inside that container.
+
+The image disables dbt's automatic `.env` loading. Compose supplies the required
+variables directly; the host `.env` stays mode `600` and need not be readable by
+the container user.
 
 ```sh
-set -a; . ./.env; set +a
-export DBT_ALLOW_EXPERIMENTAL_ADAPTERS=true
-dbt build --project-dir dbt --profiles-dir dbt
+docker compose exec -T airflow dbt build --project-dir dbt --profiles-dir dbt
 ```
 
 `dbt build` runs the models in dependency order and then their tests; any failed
@@ -221,7 +230,7 @@ Inspect the result and re-run the checks on their own:
 docker compose exec postgres psql -U sec_admin -d sec_research \
   -c 'SELECT metric, fiscal_year, value, accession FROM gold.annual_metrics ORDER BY metric, fiscal_year' \
   -c 'SELECT count(*) FROM silver.financial_facts_quarantine'
-dbt test --project-dir dbt --profiles-dir dbt
+docker compose exec -T airflow dbt test --project-dir dbt --profiles-dir dbt
 ```
 
 The bronze ingestion tests are unaffected: `pytest tests/ingestion`.
@@ -241,22 +250,19 @@ dbt cannot parse HTML or compute embeddings:
 4. **Build and check gold** (dbt): build and test `gold.retrieval_passages`.
 
 ```sh
-set -a; . ./.env; set +a
-export DBT_ALLOW_EXPERIMENTAL_ADAPTERS=true
-
-docker compose exec app python -m extraction
-dbt build --select silver --indirect-selection cautious --project-dir dbt --profiles-dir dbt
-docker compose exec app python -m embeddings
-dbt build --project-dir dbt --profiles-dir dbt
+docker compose exec -T airflow python -m extraction
+docker compose exec -T airflow dbt build --select silver --indirect-selection cautious --project-dir dbt --profiles-dir dbt
+docker compose exec -T airflow python -m embeddings
+docker compose exec -T airflow dbt build --project-dir dbt --profiles-dir dbt
 ```
 
 The `--indirect-selection cautious` on the silver step keeps cross-layer tests
 (which reference not-yet-built gold) out of that build; the final full `dbt build`
-runs them once gold exists. With Podman, substitute `podman-compose exec app` and
+runs them once gold exists. With Podman, substitute `podman-compose exec -T airflow` and
 `podman-compose`, as above.
-The `app` image now installs `sentence-transformers` (and its CPU PyTorch
-dependency) on first start, so the first `up` takes longer and needs network; the
-model weights are downloaded and cached on first embedding run.
+Both images include the locked embedding dependencies. Model weights are
+downloaded on first use; the API keeps its cache in writable temporary storage,
+so a recreated API container downloads them again.
 The embedding step must run between the silver and gold builds: gold joins each
 silver passage to its vector, and the full build fails if any passage still lacks
 one for the pinned model (`retrieval_passages_covers_all_passages`), so partial
@@ -312,7 +318,7 @@ carried citation metadata and the full bounded passage text (the CLI prints a
 short preview of that text).
 
 ```sh
-docker compose exec app python -m embeddings.search \
+docker compose exec -T airflow python -m embeddings.search \
   "how did revenue change and why?" --cik 320193 --limit 5
 # add --include-superseded to search amended/superseded filings too
 ```
@@ -329,26 +335,24 @@ docker compose exec postgres psql -U sec_admin -d sec_research \
 `api/` serves `POST /questions` over the published gold datasets only. It
 connects with the read-only `GOLD_API_DB_USER` role, so the database — not just
 the application — denies access to `silver` and `bronze`. Routing is
-deterministic (decision H007): the request is resolved and validated, then mapped
-to the approved tools. No language model selects the tool or writes SQL here;
-LLM answer composition is a later task (T006).
+deterministic: the request is resolved and validated, then mapped to approved
+tools. The LLM composes answers after retrieval; natural-language interpretation
+of metric and year selections is planned work.
 
-Run the API (it uses the same `.env` as the rest of the stack):
+Compose starts the API automatically at `http://localhost:18000` with the example
+ports. Use `/docs`, `/health`, or `POST /questions`; do not start a second API
+process inside `app`.
+
+For optional host development, install the lock above and source `.env`. Use a
+separate port if the container API is running:
 
 ```sh
-# On the host, with requirements installed and PGHOST/PGPORT pointed at the
-# published Postgres port (POSTGRES_PORT):
 set -a; . ./.env; set +a
-PGHOST=localhost PGPORT="$POSTGRES_PORT" python -m api    # 127.0.0.1:8000
-
-# Or inside the app container (Compose env already sets PGDATABASE/PGHOST):
-docker compose exec app python -m api
+PGHOST=127.0.0.1 PGPORT="$POSTGRES_PORT" API_PORT=8901 python -m api
 ```
 
-`API_HOST` and `API_PORT` override the bind address (defaults `127.0.0.1:8000`).
-The app service does not publish a port; exposing it to the host is outside T005,
-so run the API on the host (as above) or reach it from inside the Compose
-network.
+`API_HOST` and `API_PORT` control the host process. Compose fixes the container
+port at 8000 and maps `.env`'s `API_PORT` to it on localhost.
 
 ### Request
 
@@ -430,7 +434,7 @@ curl -s localhost:8000/questions -H 'content-type: application/json' -d '{
 
 ## 9. Compose cited answers (LLM)
 
-T006 sends the T005 evidence package to an OpenAI-compatible chat model and
+The answer composer sends the evidence package to an OpenAI-compatible chat model and
 attaches a cited `answer` to the `POST /questions` response. No SDK is used: the
 client is a standard-library `urllib` call to `<LLM_BASE_URL>/chat/completions`,
 so the project adds no dependency and works with OpenAI, a compatible gateway, or
@@ -445,12 +449,9 @@ Configuration (`.env`):
 | `LLM_API_KEY` | Bearer token for a hosted provider; omit it for a local server with an explicit base URL. |
 | `LLM_INPUT_COST_PER_1K` / `LLM_OUTPUT_COST_PER_1K` | Optional USD per-1K-token prices; cost is logged as `null` when unset. |
 
-```sh
-set -a; . ./.env; set +a
-python -m api
-```
+Restart the Compose API after configuring these variables (command below).
 
-When configured, each `ok` response gains an `answer` object; the T005
+When configured, each `ok` response gains an `answer` object; the
 `calculations`/`passages` are unchanged:
 
 ```jsonc
@@ -496,18 +497,19 @@ When configured, each `ok` response gains an `answer` object; the T005
   the endpoint returns exactly the section 8 response shape.
 - Run the answer tests with `pytest tests/api`.
 
-Note: the Compose `app` service does not forward `LLM_*` (compose.yaml is
-outside T006 scope). Run `python -m api` on the host, or pass them explicitly,
-e.g. `docker compose exec -e LLM_MODEL=gpt-4o-mini app python -m api`.
+The Compose `app` service forwards the LLM settings from `.env`. After editing
+them, run `docker compose up -d --no-deps --force-recreate app` (or the Podman
+equivalent). `/health` reports `answer_composition: true` when configured;
+`POST /questions` then includes the generated reply in `answer.text`.
 
 ## 10. Schedule the pipeline (Airflow)
 
-T007 wraps the manual stages in an Airflow DAG that runs both medallion branches
+Airflow wraps the manual stages in an Airflow DAG that runs both medallion branches
 and publishes gold atomically. Airflow runs as a Compose service built from
-`airflow/Dockerfile`; the pipeline dependencies from `requirements.txt` and
-`dbt-postgres` are installed in that image. The host keeps dbt Fusion for the
-manual commands above (decision H009), while the DAG uses dbt-core in the
-container. The repo is mounted read-only, so dbt writes its `target/` and
+`airflow/Dockerfile` uses Apache's slim image, without unrelated provider extras;
+the pipeline dependencies from `requirements.txt` and
+`dbt-postgres` are installed from the locks in that image. Both manual commands and the DAG use the same dbt-core environment. The repo
+is mounted read-only, so dbt writes its `target/` and
 `logs/` under `/tmp` inside the container.
 
 Start it:
@@ -517,7 +519,8 @@ docker compose up -d airflow      # or: podman-compose up -d airflow
 ```
 
 After changing the dependency policy, rebuild with
-`docker compose build airflow` before starting a replacement container. Installing
+`docker compose build app airflow` before recreating the containers with
+`docker compose up -d`. Installing
 or removing packages in an existing container does not shrink its original image.
 
 `airflow-db-init` creates a dedicated `airflow` metadata database in the
@@ -612,10 +615,12 @@ docker compose exec postgres psql -U sec_admin -d sec_research \
   -c "SELECT tablename FROM pg_tables WHERE schemaname='gold' ORDER BY 1"
 ```
 
-The Airflow UI is not published to the host by default (like the app service);
-trigger runs from the CLI as above, or add a port mapping in a local override.
+With `.env.example`'s ports, the Airflow UI is at `http://localhost:18080` and
+API docs at `http://localhost:18000/docs`. Change `AIRFLOW_PORT` / `API_PORT` in
+`.env` to use other host ports. See [run.md](run.md) for the short container-only
+startup guide.
 
-## 11. Expand and evaluate (T008)
+## 11. Expand and evaluate
 
 The sample scope is five companies (`ingestion/mappings/companies.json`): AAPL,
 MSFT, GOOGL, AMZN, and META. Each is ingested for its three most recent 10-K
@@ -625,33 +630,48 @@ Alphabet switched to `us-gaap:Revenues` in its FY2025 10-K.
 From a fresh checkout (stack up and `.env` sourced, as in sections 1–2), run:
 
 ```sh
-set -a; . ./.env; set +a
-export DBT_ALLOW_EXPERIMENTAL_ADAPTERS=true
-
 for c in AAPL MSFT GOOGL AMZN META; do
-  docker compose exec app python -m ingestion --company "$c" --years 3
+  docker compose exec -T airflow python -m ingestion --company "$c" --years 3
 done
-docker compose exec app python -m extraction
-dbt build --select silver --indirect-selection cautious --project-dir dbt --profiles-dir dbt
-docker compose exec app python -m embeddings
-dbt build --project-dir dbt --profiles-dir dbt
+docker compose exec -T airflow python -m extraction
+docker compose exec -T airflow dbt build --select silver --indirect-selection cautious --project-dir dbt --profiles-dir dbt
+docker compose exec -T airflow python -m embeddings
+docker compose exec -T airflow dbt build --project-dir dbt --profiles-dir dbt
 ```
 
-With Podman, substitute `podman-compose exec app`/`podman-compose`. Reruns are
+With Podman, substitute `podman-compose exec -T airflow`/`podman-compose`. Reruns are
 idempotent. `evaluation/smoke.sh` runs this same sequence and then the
 evaluation.
 
 ### Evaluate
 
 `evaluation/run.py` runs the 25-question set in `evaluation/questions.json`
-through the real `POST /questions` endpoint (it starts the API itself), checks
+through the real `POST /questions` endpoint (use `--base` for the running API), checks
 each answer against hand-checked ground truth from published gold, verifies
 gold → silver → bronze lineage and that the API role is denied the lower layers,
 and writes `evaluation/results.json` and `docs/evaluation-report.md`:
 
+Evaluation runs on the host so it can save `evaluation/results.json`,
+`evaluation/citation-review.md`, and `docs/evaluation-report.md`. Install the
+shared lock in a host virtual environment first (CPU dependencies above):
+
 ```sh
-python -m evaluation.run
+set -a; . ./.env; set +a
+PGHOST=127.0.0.1 PGPORT="$POSTGRES_PORT" .venv/bin/python -m evaluation.run \
+  --base "http://127.0.0.1:$API_PORT"
 ```
+
+New answers need fresh manual judgements. Review `evaluation/citation-review.md`,
+update `evaluation/citation-judgements.json`, then score the saved results without
+another model or database call:
+
+```sh
+.venv/bin/python -m evaluation.run --from-results \
+  --support-judgements evaluation/citation-judgements.json
+```
+
+Use the same command with the committed results to recompute the historical
+citation-support score. Do not reuse old judgements for newly generated answers.
 
 Composed-answer metrics (citation support, model latency, cost) and the
 prompt-injection case need a language model: set `LLM_MODEL` (plus
@@ -680,6 +700,11 @@ from scratch.
 Created once, when the database volume is first initialized, by
 `db/init/01-init.sh`:
 
+All published service ports bind to localhost. The API container has only gold
+and optional LLM credentials, a non-root user, and no host checkout mount.
+Preparation commands run in Airflow, which has pipeline and storage credentials.
+See [SECURITY.md](../SECURITY.md) before adapting this stack for public hosting.
+
 | Role | Source | Access |
 | --- | --- | --- |
 | `POSTGRES_USER` (default `sec_admin`) | `.env` | Superuser; bootstraps the database. |
@@ -691,8 +716,7 @@ API role through default privileges, without a further grant.
 
 ## MinIO image note
 
-MinIO removed its own public images from Docker Hub and Quay in 2025-2026. The
-defaults therefore point at Chainguard's maintained builds:
+The default images are Chainguard builds:
 
 ```text
 cgr.dev/chainguard/minio:latest
@@ -708,3 +732,25 @@ To pin a digest or use another registry, set `MINIO_IMAGE` and
 docker compose down        # stop, keep volumes
 docker compose down -v     # stop and delete volumes and all data
 ```
+
+## Maintain dependencies
+
+`requirements.txt` and `airflow/requirements.txt` declare supported ranges;
+`requirements.lock` and `airflow/requirements.lock` record the resolved packages.
+Each image has its own complete lock so Airflow's dependency bounds are respected.
+Regenerate with uv after intentionally changing a range:
+
+```sh
+uv pip compile requirements.txt --python-version 3.12 --python-platform x86_64-unknown-linux-gnu --extra-index-url https://download.pytorch.org/whl/cpu --index-strategy unsafe-best-match --output-file requirements.lock --no-header
+uv pip compile requirements.txt airflow/requirements.txt --python-version 3.12 --python-platform x86_64-unknown-linux-gnu --extra-index-url https://download.pytorch.org/whl/cpu --index-strategy unsafe-best-match --output-file airflow/requirements.lock --no-header
+```
+
+The resolver consults PyPI and the official PyTorch index; installation still
+fetches only the pinned CPU wheel from the PyTorch index. Rebuild both images,
+run the tests, check a real encoder output, and audit both locks before accepting
+an upgrade. The 2026-10-12 evaluation remains historical evidence and should not
+be relabelled as a measurement of upgraded dependencies.
+
+The CPU wheel's `+cpu` version suffix is not indexed by PyPI advisories. CI also
+queries the upstream PyTorch version without that suffix; this checks published
+advisories, not the provenance or operating-system contents of the wheel.
