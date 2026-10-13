@@ -1,12 +1,10 @@
-# Local development stack for the SEC Research Assistant (task T001).
+# Local development stack for the SEC Research Assistant.
 #
 # Compose specification, so `docker compose` and `podman-compose` both work.
 # Every credential comes from the environment (.env); see .env.example.
 #
 # Images are fully qualified so they resolve identically under Docker and
-# Podman. The MinIO defaults point at Chainguard's maintained builds because
-# MinIO removed its own public images from Docker Hub and Quay in 2025-2026;
-# override MINIO_IMAGE / MINIO_CLIENT_IMAGE in .env if you prefer another source.
+# Podman. Override MINIO_IMAGE / MINIO_CLIENT_IMAGE in .env to pin a digest.
 name: sec-research-assistant
 
 services:
@@ -23,7 +21,7 @@ services:
       GOLD_API_DB_USER: ${GOLD_API_DB_USER:?set GOLD_API_DB_USER in .env}
       GOLD_API_DB_PASSWORD: ${GOLD_API_DB_PASSWORD:?set GOLD_API_DB_PASSWORD in .env}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d:ro
@@ -41,8 +39,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
     ports:
-      - "${MINIO_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+      - "127.0.0.1:${MINIO_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
       - minio-data:/data
 
@@ -59,46 +57,38 @@ services:
       MC_HOST_local: http://${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env}:${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}@minio:9000
     command: ["mb", "--ignore-existing", "local/${MINIO_BUCKET:-bronze}"]
 
-  # Python application. Dependencies are installed from the repo mount at start
-  # because there is no Dockerfile yet (decision H003); the container then stays
-  # up so ingestion can be run with
-  #   docker compose exec app python -m ingestion --company AAPL --years 3
+  # API only: pipeline commands run in the Airflow service.
   app:
-    image: docker.io/library/python:3.12-slim
-    working_dir: /app
-    command:
-      - sh
-      - -c
-      - >-
-        python -m pip install --no-cache-dir -q --no-deps
-        --index-url https://download.pytorch.org/whl/cpu -r requirements-cpu.txt
-        && python -m pip install --no-cache-dir -q -r requirements.txt
-        && exec sleep infinity
+    image: localhost/sec-research-assistant_api:cpu
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=512m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
-      minio:
-        condition: service_started
     environment:
+      API_HOST: 0.0.0.0
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_TIMEOUT: ${LLM_TIMEOUT:-30}
+      LLM_INPUT_COST_PER_1K: ${LLM_INPUT_COST_PER_1K:-}
+      LLM_OUTPUT_COST_PER_1K: ${LLM_OUTPUT_COST_PER_1K:-}
       PGHOST: postgres
       PGPORT: "5432"
       PGDATABASE: ${POSTGRES_DB:?set POSTGRES_DB in .env}
-      PIPELINE_DB_USER: ${PIPELINE_DB_USER}
-      PIPELINE_DB_PASSWORD: ${PIPELINE_DB_PASSWORD}
       GOLD_API_DB_USER: ${GOLD_API_DB_USER}
       GOLD_API_DB_PASSWORD: ${GOLD_API_DB_PASSWORD}
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-      MINIO_BUCKET: ${MINIO_BUCKET:-bronze}
-      SEC_USER_AGENT: ${SEC_USER_AGENT:?set SEC_USER_AGENT in .env}
-    volumes:
-      - .:/app
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
 
-  # One-shot: create the Airflow metadata database if it is missing. Idempotent,
-  # so it also covers data volumes initialized before T007 (init hooks do not
-  # rerun). Airflow metadata is kept separate from the application data.
+  # One-shot: create the Airflow metadata database on fresh or existing volumes.
   airflow-db-init:
     image: docker.io/library/postgres:16
     depends_on:
@@ -113,15 +103,15 @@ services:
         psql -h postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='airflow'" | grep -q 1 \
           || psql -h postgres -d postgres -c 'CREATE DATABASE airflow'
 
-  # Airflow 3 (LocalExecutor) runs the T007 pipeline using the same CLIs and
-  # .env as the app service. The repo is mounted and the image already contains
-  # the pipeline dependencies plus dbt-postgres (decision H009).
+  # Airflow runs the pipeline CLIs with write credentials and a read-only checkout.
   airflow:
     image: localhost/sec-research-assistant_airflow:cpu
     build:
       context: .
       dockerfile: airflow/Dockerfile
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:${AIRFLOW_PORT:-8080}:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -133,12 +123,12 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/repo/airflow/dags
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
-      # The metadata URL is built at startup with URL-encoded credentials (F037):
+      # The metadata URL is built at startup with URL-encoded credentials:
       # compose cannot safely paste a password containing '@' into a URL.
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       # Read-only API role: the candidate post-hook revokes and the publisher
-      # grants SELECT on the served gold tables (F036).
+      # grants SELECT on the served gold tables.
       GOLD_API_DB_USER: ${GOLD_API_DB_USER}
       # dbt and Python pipeline steps reuse the stack's connection variables.
       PGHOST: postgres
@@ -155,15 +145,13 @@ services:
       SEC_USER_AGENT: ${SEC_USER_AGENT:?set SEC_USER_AGENT in .env}
       PYTHONPATH: /opt/airflow/repo
       # The wrapper at /opt/airflow/bin/airflow builds the encoded metadata URL
-      # for the container command and for `compose exec` (F037).
+      # for the container command and for `compose exec`.
       PATH: /opt/airflow/bin:/home/airflow/.local/bin:/usr/local/bin:/usr/bin:/bin
       # The repo is mounted read-only; keep dbt and Python artifacts writable.
       PYTHONDONTWRITEBYTECODE: "1"
       DBT_TARGET_PATH: /tmp/dbt-target
       DBT_LOG_PATH: /tmp/dbt-logs
-      _AIRFLOW_WWW_USER_CREATE: "true"
-      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_USER:-airflow}
-      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_PASSWORD:-airflow}
+    working_dir: /opt/airflow/repo
     volumes:
       - .:/opt/airflow/repo:ro
       - airflow-logs:/opt/airflow/logs

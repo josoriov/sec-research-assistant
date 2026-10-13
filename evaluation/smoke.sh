@@ -2,24 +2,20 @@
 # Fresh-checkout smoke: ingest the five-company sample, rebuild silver/gold, and
 # run the evaluation. Requires the stack up (sections 1-2 of docs/setup.md) and
 # .env available in the environment; run `set -a; . ./.env; set +a` first.
+# Host Python needs requirements.lock; dbt runs in Airflow.
 #
-#   PYTHON=/path/to/venv/bin/python sh evaluation/smoke.sh        # host python + dbt
-#   COMPOSE=podman-compose sh evaluation/smoke.sh                 # app container for python
+#   PYTHON=.venv/bin/python sh evaluation/smoke.sh
+#   COMPOSE=podman-compose PYTHON=.venv/bin/python sh evaluation/smoke.sh
 #
 # Reruns are idempotent.
 set -eu
 
 PYTHON="${PYTHON:-python}"
-COMPOSE="${COMPOSE:-}"
-export DBT_ALLOW_EXPERIMENTAL_ADAPTERS="${DBT_ALLOW_EXPERIMENTAL_ADAPTERS:-true}"
+COMPOSE="${COMPOSE:-docker compose}"
 COMPANIES="${COMPANIES:-AAPL MSFT GOOGL AMZN META}"
 
 run_python() {
-  if [ -n "$COMPOSE" ]; then
-    $COMPOSE exec -T app python "$@"
-  else
-    "$PYTHON" "$@"
-  fi
+  $COMPOSE exec -T airflow python "$@"
 }
 
 for company in $COMPANIES; do
@@ -31,13 +27,14 @@ echo "== extract"
 run_python -m extraction
 
 echo "== silver"
-dbt build --select silver --indirect-selection cautious --project-dir dbt --profiles-dir dbt
+$COMPOSE exec -T airflow dbt build --select silver --indirect-selection cautious --project-dir dbt --profiles-dir dbt
 
 echo "== embeddings"
 run_python -m embeddings
 
 echo "== gold"
-dbt build --project-dir dbt --profiles-dir dbt
+$COMPOSE exec -T airflow dbt build --project-dir dbt --profiles-dir dbt
 
 echo "== evaluation"
-run_python -m evaluation.run
+PGHOST=127.0.0.1 PGPORT="${POSTGRES_PORT:-5432}" \
+  "$PYTHON" -m evaluation.run --base "http://127.0.0.1:${API_PORT:-8000}"

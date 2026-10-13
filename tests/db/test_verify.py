@@ -15,11 +15,11 @@ def test_verify_uses_compose_resolved_bucket(tmp_path, bucket):
     compose = tmp_path / "compose.py"
     compose.write_text('''import os, subprocess, sys
 args = sys.argv[1:]
-if args[0] == 'exec':
+if args[0] == 'exec' and 'postgres' in args:
     sys.stdin.read()
-elif 'app' in args:
+elif 'airflow' in args:
     env = dict(os.environ, MINIO_BUCKET=os.environ['RESOLVED_BUCKET'])
-    sys.exit(subprocess.run(args[args.index('app') + 1:], env=env, check=False).returncode)
+    sys.exit(subprocess.run(args[args.index('airflow') + 1:], env=env, check=False).returncode)
 else:
     assert args[-2:] == ['ls', 'local/' + os.environ['RESOLVED_BUCKET']], args
     sys.exit(int(os.environ.get('BUCKET_MISSING', '0')))

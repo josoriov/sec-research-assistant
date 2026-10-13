@@ -85,7 +85,7 @@ ROLLBACK;
 SQL
 
 # Let Compose resolve .env, overrides and defaults; the Python image needs no packages.
-MINIO_BUCKET="$($COMPOSE run -T --rm --no-deps app python -c 'import os; print(os.environ["MINIO_BUCKET"])')"
+MINIO_BUCKET="$($COMPOSE exec -T airflow python -c 'import os; print(os.environ["MINIO_BUCKET"])')"
 echo "== MinIO: ${MINIO_BUCKET} bucket =="
 $COMPOSE run -T --rm --no-deps minio-init ls "local/${MINIO_BUCKET}" >/dev/null
 echo "MinIO checks passed: ${MINIO_BUCKET} bucket reachable."

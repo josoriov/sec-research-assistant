@@ -3,6 +3,10 @@
 
 # Local environment credentials: never commit real secrets
 .env
+.env.*
+!.env.example
+.venv/
+.ruff_cache/
 
 # Local implementation and review notes
 .dev-notes/

@@ -11,6 +11,9 @@ from __future__ import annotations
 
 import inspect
 import json
+import os
+import subprocess
+from pathlib import Path
 
 from api.answering import ChatResult
 from api.schemas import Answer, Citation
@@ -155,6 +158,28 @@ def test_citation_support_excludes_answers_without_citations():
                _res("Q3", None, status="needs_clarification")]
     summary = run.summarise(results, {"Q1": True, "Q2": True, "Q3": True})
     assert summary["citation_support_judged"] == {"passed": 1, "total": 1}
+
+
+def test_smoke_uses_airflow_for_preparation_and_host_for_evaluation(tmp_path):
+    trace = tmp_path / "trace"
+    compose = tmp_path / "compose.sh"
+    compose.write_text('printf "%s\\n" "$*" >> "$TRACE"\n')
+    python = tmp_path / "python.sh"
+    python.write_text('#!/bin/sh\nset -eu\n'
+                      'test "$PGHOST" = 127.0.0.1\n'
+                      'test "$PGPORT" = 15432\n'
+                      'printf "host %s\\n" "$*" >> "$TRACE"\n')
+    python.chmod(0o755)
+    env = dict(os.environ, TRACE=str(trace), COMPOSE=f"sh {compose}",
+               PYTHON=str(python), COMPANIES="AAPL MSFT",
+               POSTGRES_PORT="15432", API_PORT="18000")
+    script = Path(__file__).resolve().parents[2] / "evaluation" / "smoke.sh"
+    subprocess.run(["sh", str(script)], env=env, check=True)
+    calls = trace.read_text().splitlines()
+    assert len(calls) == 7
+    assert all(call.startswith("exec -T airflow ") for call in calls[:-1])
+    assert any("airflow dbt build" in call for call in calls)
+    assert calls[-1] == "host -m evaluation.run --base http://127.0.0.1:18000"
 
 
 def test_regenerate_persists_summary_used_by_the_report(monkeypatch, tmp_path):

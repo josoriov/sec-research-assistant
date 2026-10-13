@@ -12,3 +12,7 @@ dbt/target
 dbt/logs
 dbt/dbt_packages
 .env
+.env.*
+.aws
+.agents
+.codex
