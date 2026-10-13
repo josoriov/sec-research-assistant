@@ -189,10 +189,11 @@ def test_regenerate_persists_summary_used_by_the_report(monkeypatch, tmp_path):
     review_path = tmp_path / "citation-review.md"
     report_path = tmp_path / "report.md"
     cited = {"text": "a", "citations": [{"id": "metric:x", "kind": "metric"}],
-             "abstained": False, "limitations": None}
+             "abstained": False, "limitations": None, "model": "saved-model"}
     payload = {
-        "generated": "x", "model_mode": "enabled",
-        "summary": {"citation_support_judged": None, "cost_usd_total": None},
+        "generated": "2026-10-12T16:48:51+00:00", "model_mode": "enabled",
+        "summary": {"citation_support_judged": None, "cost_usd_total": 0.5,
+                    "prices_per_1k": {"input": 0.01, "output": 0.02}},
         "lineage": {"metric_chain_ok": True, "metric_chain": [],
                     "passage_chain_ok": True, "passage_chain": []},
         "boundary": {"all_denied": True, "denied": {}},
@@ -209,4 +210,9 @@ def test_regenerate_persists_summary_used_by_the_report(monkeypatch, tmp_path):
     stored = json.loads(results_path.read_text())
     assert stored["summary"]["citation_support_judged"] == {"passed": 1, "total": 1}
     assert "1/1" in report_path.read_text()
+    assert "--from-results --support-judgements evaluation/citation-judgements.json" in report_path.read_text()
+    assert "Generated 2026-10-12 16:48 UTC" in report_path.read_text()
+    assert "`saved-model`" in report_path.read_text()
+    assert summary["cost_usd_total"] == 0.5
+    assert summary["prices_per_1k"] == {"input": 0.01, "output": 0.02}
     assert summary["citation_support_judged"] == {"passed": 1, "total": 1}

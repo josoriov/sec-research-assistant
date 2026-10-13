@@ -73,5 +73,17 @@ Question set: 25 manually checked questions (numerical, document, mixed, unanswe
 
 ```sh
 set -a; . ./.env; set +a
-python -m evaluation.run
+PGHOST=127.0.0.1 PGPORT="$POSTGRES_PORT" .venv/bin/python -m evaluation.run --base "http://127.0.0.1:$API_PORT"
 ```
+
+New answers require fresh manual citation judgements. Review
+`evaluation/citation-review.md`, update `evaluation/citation-judgements.json`,
+then recompute the saved results without database or model calls:
+
+```sh
+.venv/bin/python -m evaluation.run --from-results --support-judgements evaluation/citation-judgements.json
+```
+
+The same command scores the committed historical results. Do not apply the old
+judgements to newly generated answers. Install the locked host dependencies as
+explained in [setup](setup.md) before running either command.

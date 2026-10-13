@@ -501,9 +501,12 @@ def write_review(results: list[dict]) -> None:
     REVIEW_PATH.write_text("\n".join(lines) + "\n")
 
 
-def write_report(summary, results, lineage, boundary, injection, mode) -> None:
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    model = os.environ.get("LLM_MODEL") if mode == "enabled" else None
+def write_report(summary, results, lineage, boundary, injection, mode,
+                 *, generated: str | None = None) -> None:
+    timestamp = datetime.fromisoformat(generated) if generated else datetime.now(timezone.utc)
+    now = timestamp.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    model = next(((r["response"].get("answer") or {}).get("model")
+                  for r in results if (r["response"].get("answer") or {}).get("model")), None)
     lines = [
         "# Evaluation report",
         "",
@@ -511,7 +514,8 @@ def write_report(summary, results, lineage, boundary, injection, mode) -> None:
         "",
         f"Question set: {summary['total']} manually checked questions "
         "(numerical, document, mixed, unanswerable). Model: "
-        + (f"`{model}`" if model else "**not configured** — composed-answer metrics were not measured"),
+        + (f"`{model}`" if model else "**not recorded**" if mode == "enabled"
+           else "**not configured** — composed-answer metrics were not measured"),
         "",
         "## Metrics",
         "",
@@ -574,7 +578,15 @@ def write_report(summary, results, lineage, boundary, injection, mode) -> None:
         "",
         "```sh",
         "set -a; . ./.env; set +a",
-        "python -m evaluation.run",
+        'PGHOST=127.0.0.1 PGPORT="$POSTGRES_PORT" python -m evaluation.run --base "http://127.0.0.1:$API_PORT"',
+        "```",
+        "",
+        "Review new answers in `evaluation/citation-review.md` and update",
+        "`evaluation/citation-judgements.json` before scoring citation support.",
+        "To recompute the saved run without database or model calls:",
+        "",
+        "```sh",
+        "python -m evaluation.run --from-results --support-judgements evaluation/citation-judgements.json",
         "```",
     ]
     REPORT_PATH.write_text("\n".join(lines) + "\n")
@@ -589,11 +601,17 @@ def regenerate(judgements: dict | None) -> dict:
     """
     payload = json.loads(RESULTS_PATH.read_text())
     summary = summarise(payload["results"], judgements)
+    # Citation adjudication does not change the run's recorded pricing or cost.
+    previous = payload.get("summary", {})
+    for key in ("prices_per_1k", "cost_usd_total"):
+        if key in previous:
+            summary[key] = previous[key]
     payload["summary"] = summary
     RESULTS_PATH.write_text(json.dumps(payload, indent=2, default=str))
     write_review(payload["results"])
     write_report(summary, payload["results"], payload["lineage"], payload["boundary"],
-                 payload["prompt_injection"], payload["model_mode"])
+                 payload["prompt_injection"], payload["model_mode"],
+                 generated=payload["generated"])
     return summary
 
 
