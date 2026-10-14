@@ -1,7 +1,8 @@
-"""Validate interpreted fields against the existing request contract.
+"""Server-side interpretation of questions into the existing request contract.
 
-Release v0.2 stage 1 (task T009) reuses QuestionRequest and the existing routing
-rules. Later stages add LLM interpretation and endpoint orchestration.
+Release v0.2 stage 1 (task T009): validate interpreted fields against
+`QuestionRequest` and the T005 routing rules before any query. Stage 2 (task
+T010) adds the LLM interpreter; stage 3 wires this into `POST /questions`.
 """
 from __future__ import annotations
 
@@ -10,5 +11,27 @@ from api.interpretation.contract import (
     ValidationResult,
     validate_interpretation,
 )
+from api.interpretation.interpreter import (
+    MALFORMED,
+    PROVIDER,
+    InterpretationError,
+    InterpretationResult,
+    build_messages,
+    interpret,
+    interpret_and_validate,
+    parse_interpretation,
+)
 
-__all__ = ["Interpretation", "ValidationResult", "validate_interpretation"]
+__all__ = [
+    "MALFORMED",
+    "PROVIDER",
+    "Interpretation",
+    "InterpretationError",
+    "InterpretationResult",
+    "ValidationResult",
+    "build_messages",
+    "interpret",
+    "interpret_and_validate",
+    "parse_interpretation",
+    "validate_interpretation",
+]
