@@ -1,8 +1,10 @@
-"""Request/response models for POST /answer.
+"""Request/response models for POST /answer and POST /ask.
 
 Pydantic validates the shape of the request (types, ranges, enum values) before
 any tool runs; the router then resolves company/metric/period and either returns
-`needs_clarification` or an evidence package.
+`needs_clarification` or an evidence package. `POST /ask` (release v0.2) accepts
+a natural-language prompt plus explicit selections and returns that same package
+with the interpreted request and, on failure, an `error` status.
 """
 from __future__ import annotations
 
@@ -95,3 +97,38 @@ class QuestionResponse(BaseModel):
     # Composed cited answer (task T006); omitted from the response when no model
     # is configured (H008), via response_model_exclude_unset at the route.
     answer: Answer | None = None
+
+
+class AskRequest(BaseModel):
+    """POST /ask: a natural-language question with explicit selections (T011).
+
+    The company is required (the user picks one); the metric is optional and,
+    when given, takes precedence over the interpreted metric. Fiscal years are
+    not selected here — the interpreter extracts them from the prompt.
+    """
+
+    company: str = Field(min_length=1, description="Ticker (e.g. AAPL) or numeric CIK")
+    metric: str | None = Field(
+        default=None, description="Optional explicit metric; overrides interpretation"
+    )
+    question: str = Field(min_length=1, description="Natural-language question")
+
+
+class AskResponse(BaseModel):
+    """POST /ask: the endpoint response plus how the prompt was understood.
+
+    Carries the complete evidence/answer package so nothing is lost for display,
+    the validated `request` the prompt was mapped to, and `error` when
+    interpretation failed (a provider or malformed-reply failure, distinct from a
+    user-correctable clarification). Defined separately from `QuestionResponse`
+    because its `status` deliberately adds an `error` state (`/answer` never
+    returns it).
+    """
+
+    status: Literal["ok", "needs_clarification", "error"]
+    clarifications: list[Clarification] = Field(default_factory=list)
+    calculations: list[dict] = Field(default_factory=list)
+    passages: list[dict] = Field(default_factory=list)
+    answer: Answer | None = None
+    request: QuestionRequest | None = None
+    error: str | None = None

@@ -1,9 +1,14 @@
-"""FastAPI application exposing POST /answer (tasks T005 and T006).
+"""FastAPI application exposing POST /answer and POST /ask.
 
-The route opens a read-only gold connection per request, runs the approved tools
+`POST /answer` (tasks T005/T006) takes a validated structured request: the route
+opens a read-only gold connection per request, runs the approved tools
 (`api.router.answer_question`), and — when a language model is configured —
 attaches a cited answer (`api.answering`). Without a configured model the
 response is exactly the T005 evidence package.
+
+`POST /ask` (release v0.2, task T011) takes a natural-language prompt with the
+selected company and optional metric, interprets and validates it
+(`api.interpretation`), and submits the validated request to the same handler.
 """
 from __future__ import annotations
 
@@ -15,8 +20,14 @@ from api.answering import (
     client_from_env,
     configure_logging,
 )
+from api.ask import ask_question
 from api.router import company_cik_map
-from api.schemas import QuestionRequest, QuestionResponse
+from api.schemas import (
+    AskRequest,
+    AskResponse,
+    QuestionRequest,
+    QuestionResponse,
+)
 
 
 def create_app(client=None) -> FastAPI:
@@ -41,6 +52,18 @@ def create_app(client=None) -> FastAPI:
         conn = db.connect()
         try:
             return answer_question_with_citations(
+                request, conn=conn, company_ciks=company_cik_map(), client=llm_client
+            )
+        finally:
+            conn.close()
+
+    # Natural-language entry point (release v0.2): interprets and validates the
+    # prompt, then submits the validated request to the /answer handler above.
+    @app.post("/ask", response_model=AskResponse)
+    def ask(request: AskRequest) -> AskResponse:
+        conn = db.connect()
+        try:
+            return ask_question(
                 request, conn=conn, company_ciks=company_cik_map(), client=llm_client
             )
         finally:

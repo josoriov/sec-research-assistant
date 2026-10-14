@@ -41,14 +41,22 @@ def _annual_row():
             391035000000, False, 1, 2, "0000320193-24-000123", "10-K", "2024-11-01")
 
 
-def test_answer_route_is_registered():
-    assert any(
+def _has_route(path):
+    return any(
         isinstance(route, APIRoute)
-        and route.path == "/answer"
+        and route.path == path
         and route.methods is not None
         and "POST" in route.methods
         for route in app.routes
     )
+
+
+def test_answer_route_is_registered():
+    assert _has_route("/answer")
+
+
+def test_ask_route_is_registered():
+    assert _has_route("/ask")
 
 
 def test_answer_question_returns_a_metric_calculation():

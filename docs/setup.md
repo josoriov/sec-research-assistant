@@ -332,16 +332,16 @@ docker compose exec postgres psql -U sec_admin -d sec_research \
 
 ## 8. Ask questions (FastAPI)
 
-`api/` serves `POST /answer` over the published gold datasets only. It
-connects with the read-only `GOLD_API_DB_USER` role, so the database — not just
-the application — denies access to `silver` and `bronze`. Routing is
+`api/` serves `POST /answer` (a validated structured request) and `POST /ask`
+(a natural-language question; section 8b) over the published gold datasets only.
+It connects with the read-only `GOLD_API_DB_USER` role, so the database — not
+just the application — denies access to `silver` and `bronze`. Routing is
 deterministic: the request is resolved and validated, then mapped to approved
-tools. The LLM composes answers after retrieval; natural-language interpretation
-of metric and year selections is planned work.
+tools. The LLM composes answers after retrieval.
 
 Compose starts the API automatically at `http://localhost:18000` with the example
-ports. Use `/docs`, `/health`, or `POST /answer`; do not start a second API
-process inside `app`.
+ports. Use `/docs`, `/health`, `POST /answer`, or `POST /ask`; do not start a
+second API process inside `app`.
 
 For optional host development, install the lock above and source `.env`. Use a
 separate port if the container API is running:
@@ -432,6 +432,54 @@ curl -s localhost:8000/answer -H 'content-type: application/json' -d '{
 - When a language model is configured, an `answer` object is added to `ok`
   responses (section 9); otherwise the response is exactly as above.
 
+## 8b. Ask in natural language (POST /ask)
+
+`POST /ask` (release v0.2) is the natural-language entry point. It takes the
+selected company, an optional explicit metric, and a free-text question,
+interprets the metric and fiscal years with the configured LLM, validates the
+result against the same contract as `/answer`, and runs the validated request
+through the same handler. It never accepts model-generated SQL, and there is no
+second HTTP hop.
+
+```jsonc
+POST /ask
+{
+  "company": "AAPL",        // ticker or numeric CIK (required)
+  "metric": "revenue",      // optional; explicit selection overrides inference
+  "question": "What drove the revenue change between 2023 and 2024?"
+}
+```
+
+The response is the complete `/answer` package plus how the prompt was
+understood and, on failure, an error state:
+
+```jsonc
+{ "status": "ok",
+  "calculations": [ /* … */ ], "passages": [ /* … */ ], "answer": { /* … */ },
+  "clarifications": [],
+  "request": {"company": "AAPL", "metric": "revenue", "fiscal_years": [2023, 2024],
+              "question": "What drove the revenue change between 2023 and 2024?"},
+  "error": null }
+```
+
+`status` is:
+- `ok` — the validated request ran and the package is complete.
+- `needs_clarification` — the prompt could not be resolved (a missing,
+  unsupported, or ambiguous field); `clarifications` lists what to fix and
+  `request` is null. A request the endpoint itself cannot resolve (e.g. a fiscal
+  year with two eligible periods) has the same status with `request` set.
+- `error` — interpretation failed (the model endpoint failed, the model returned
+  an unusable reply, or no model is configured); `error` describes it.
+
+Interpretation requires the LLM (section 9); with no `LLM_MODEL`, `/ask` returns
+`status: "error"`. Explicit `company`/`metric` selections take precedence over
+the model's candidates, so a conflicting interpretation cannot override the user.
+
+```sh
+curl -s localhost:8000/ask -H 'content-type: application/json' -d '{
+  "company": "AAPL", "question": "What drove the revenue change between 2023 and 2024?"}'
+```
+
 ## 9. Compose cited answers (LLM)
 
 The answer composer sends the evidence package to an OpenAI-compatible chat model and
@@ -500,7 +548,8 @@ When configured, each `ok` response gains an `answer` object; the
 The Compose `app` service forwards the LLM settings from `.env`. After editing
 them, run `docker compose up -d --no-deps --force-recreate app` (or the Podman
 equivalent). `/health` reports `answer_composition: true` when configured;
-`POST /answer` then includes the generated reply in `answer.text`.
+`POST /answer` (and `POST /ask`) then includes the generated reply in
+`answer.text`.
 
 ## 10. Schedule the pipeline (Airflow)
 
