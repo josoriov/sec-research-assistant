@@ -1,0 +1,178 @@
+---
+// Task T012: question form + clarification/correction flow. Submitting posts to
+// the same-origin /api/ask server route (see src/pages/api/ask.ts), which
+// proxies to the Python POST /ask endpoint. Displaying the full answer is T013.
+import { COMPANIES, METRICS } from '../lib/form.js';
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SEC Research Assistant</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        font: 16px/1.5 system-ui, sans-serif;
+        margin: 0;
+        padding: 2rem 1rem;
+        display: flex;
+        justify-content: center;
+      }
+      main { width: min(40rem, 100%); }
+      h1 { font-size: 1.5rem; }
+      .field { margin-block: 1rem; display: flex; flex-direction: column; gap: 0.25rem; }
+      label { font-weight: 600; }
+      select, textarea, button { font: inherit; padding: 0.5rem; border-radius: 0.25rem; }
+      select, textarea { border: 1px solid currentColor; background: transparent; color: inherit; }
+      textarea { resize: vertical; }
+      button {
+        border: 0;
+        background: #1a5fb4;
+        color: #fff;
+        cursor: pointer;
+        padding: 0.6rem 1.2rem;
+      }
+      button[disabled] { opacity: 0.6; cursor: progress; }
+      .error { color: #c01c28; margin: 0; }
+      #status { margin-block: 1rem 0; }
+      #clarifications {
+        border: 1px solid #c01c28;
+        border-radius: 0.25rem;
+        padding: 0.5rem 1rem 0.5rem 1.75rem;
+        margin-block: 1rem;
+      }
+      #request-error { border-left: 4px solid #c01c28; padding-left: 0.75rem; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>SEC Research Assistant</h1>
+      <p>
+        Ask a question about a supported company's 10-K filings. The question is
+        interpreted into a metric and fiscal years before the published data is
+        queried.
+      </p>
+
+      <form id="ask-form" novalidate>
+        <div class="field">
+          <label for="company">Company</label>
+          <select id="company" name="company" aria-describedby="company-error" required>
+            <option value="">Select a company…</option>
+            {COMPANIES.map((company) => <option value={company}>{company}</option>)}
+          </select>
+          <p class="error" id="company-error" hidden></p>
+        </div>
+
+        <div class="field">
+          <label for="metric">Metric (optional)</label>
+          <select id="metric" name="metric">
+            <option value="">Let the assistant infer it</option>
+            {METRICS.map((metric) => <option value={metric.value}>{metric.label}</option>)}
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="question">Question</label>
+          <textarea id="question" name="question" rows="3"
+            aria-describedby="question-error" required></textarea>
+          <p class="error" id="question-error" hidden></p>
+        </div>
+
+        <button type="submit" id="submit">Ask</button>
+      </form>
+
+      <p id="status" role="status" aria-live="polite" hidden></p>
+      <ul id="clarifications" aria-label="Clarifications needed" hidden></ul>
+      <p id="request-error" role="alert" hidden></p>
+    </main>
+
+    <script>
+      import { applyHttpResult, buildAskPayload, initialForm, reducer } from '../lib/form.js';
+
+      let state = initialForm();
+
+      const el = (id) => document.getElementById(id);
+      const formEl = el('ask-form');
+      const companyEl = el('company');
+      const metricEl = el('metric');
+      const questionEl = el('question');
+      const submitEl = el('submit');
+      const statusEl = el('status');
+      const clarificationsEl = el('clarifications');
+      const errorEl = el('request-error');
+      const fieldErrors = { company: el('company-error'), question: el('question-error') };
+
+      function render() {
+        submitEl.disabled = state.submitting;
+        submitEl.textContent = state.submitting ? 'Asking…' : 'Ask';
+
+        statusEl.hidden = !state.submitting;
+        statusEl.textContent = state.submitting
+          ? 'Interpreting your question and retrieving evidence…'
+          : '';
+
+        for (const [field, node] of Object.entries(fieldErrors)) {
+          const message = state.errors[field] ?? '';
+          node.hidden = !message;
+          node.textContent = message;
+        }
+
+        errorEl.hidden = !state.error;
+        errorEl.textContent = state.error ?? '';
+
+        clarificationsEl.hidden = state.clarifications.length === 0;
+        clarificationsEl.replaceChildren(
+          ...state.clarifications.map((item) => {
+            const li = document.createElement('li');
+            li.textContent = `${item.field}: ${item.reason}`;
+            return li;
+          }),
+        );
+      }
+
+      for (const [field, input] of [
+        ['company', companyEl],
+        ['metric', metricEl],
+        ['question', questionEl],
+      ]) {
+        input.addEventListener('input', () => {
+          state = reducer(state, { type: 'edit', field, value: input.value });
+          render();
+        });
+      }
+
+      formEl.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (state.submitting) return; // duplicate-submit guard
+        state = { ...state, company: companyEl.value, metric: metricEl.value, question: questionEl.value };
+
+        const next = reducer(state, { type: 'submit' });
+        const started = next.submitting && next !== state;
+        state = next;
+        render();
+        if (!started) return;
+
+        try {
+          const response = await fetch('/api/ask', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(buildAskPayload(state)),
+          });
+          let body = null;
+          try {
+            body = await response.json();
+          } catch {
+            body = null; // a proxy/upstream error body that is not JSON
+          }
+          state = applyHttpResult(state, response, body);
+        } catch {
+          state = reducer(state, { type: 'failure' });
+        }
+        render();
+      });
+
+      render();
+    </script>
+  </body>
+</html>
