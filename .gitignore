@@ -19,6 +19,11 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
+# Astro web UI (task T012): installed dependencies and build output
+web/node_modules/
+web/dist/
+web/.astro/
+
 # dbt build artifacts and local connection state
 dbt/target/
 dbt/logs/
