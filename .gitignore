@@ -1,6 +1,9 @@
 # Archify working directory: local diagram sources, receipts, and browser evidence
 .archify/
 
+# Code editor files
+.vscode/
+
 # Local environment credentials: never commit real secrets
 .env
 .env.*

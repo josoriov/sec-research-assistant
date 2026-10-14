@@ -504,6 +504,9 @@ equivalent). `/health` reports `answer_composition: true` when configured;
 
 ## 10. Schedule the pipeline (Airflow)
 
+The custom pipeline image is named `localhost/sec-research-assistant_airflow:cpu:cpu`. The Compose
+service is still named `airflow`, so the commands below use that service name.
+
 Airflow wraps the manual stages in an Airflow DAG that runs both medallion branches
 and publishes gold atomically. Airflow runs as a Compose service built from
 `airflow/Dockerfile` uses Apache's slim image, without unrelated provider extras;
