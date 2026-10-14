@@ -14,6 +14,10 @@ from airflow_pipeline import metadata_url
 
 def _parts(url: str):
     split = urlsplit(url)
+    assert split.username is not None
+    assert split.password is not None
+    assert split.hostname is not None
+    assert split.port is not None
     return unquote(split.username), unquote(split.password), split.hostname, split.port, split.path
 
 

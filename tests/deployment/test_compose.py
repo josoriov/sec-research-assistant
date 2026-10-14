@@ -28,6 +28,6 @@ def test_environment_variants_are_ignored(tmp_path):
     (tmp_path / ".gitignore").write_text((root / ".gitignore").read_text())
     for name in (".env", ".env.local", ".env.production", ".env.backup"):
         assert subprocess.run(["git", "check-ignore", "-q", name],
-                              cwd=tmp_path).returncode == 0
+                              cwd=tmp_path, check=False).returncode == 0
     assert subprocess.run(["git", "check-ignore", "-q", ".env.example"],
-                          cwd=tmp_path).returncode == 1
+                          cwd=tmp_path, check=False).returncode == 1

@@ -19,6 +19,7 @@ import subprocess
 
 import psycopg
 import pytest
+from psycopg import sql
 
 import airflow_pipeline
 from airflow_pipeline import CANDIDATE_SUFFIX, GOLD_RELATIONS, publish_gold
@@ -153,7 +154,8 @@ def test_publisher_grants_select_on_served_tables():
     try:
         admin.execute(f"drop schema if exists {PROBE_SCHEMA} cascade")
         admin.execute(f"create schema {PROBE_SCHEMA}")
-        admin.execute(f'grant usage on schema {PROBE_SCHEMA} to "{role}"')
+        admin.execute(sql.SQL("grant usage on schema {} to {}").format(
+            sql.Identifier(PROBE_SCHEMA), sql.Identifier(role)))
         for relation in relations:
             admin.execute(f'create table {PROBE_SCHEMA}."{relation}"(v int)')
             admin.execute(f'insert into {PROBE_SCHEMA}."{relation}" values (1)')

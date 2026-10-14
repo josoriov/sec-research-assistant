@@ -17,8 +17,7 @@ from pathlib import Path
 
 from api.answering import ChatResult
 from api.schemas import Answer, Citation
-
-import evaluation.run as run
+from evaluation import run
 
 VALID = ('{"answer":"Revenue grew 6%.","citations":'
          '["metric:320193:revenue:2023-10-01:2024-09-28"],'

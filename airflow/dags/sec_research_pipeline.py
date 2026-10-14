@@ -26,7 +26,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from airflow import DAG
+# Airflow is installed only in the container (H009); host type analysis cannot
+# resolve these imports, so the affected lines are ignored here rather than
+# excluding the container-only module from analysis entirely.
+from airflow import DAG  # pyright: ignore[reportAttributeAccessIssue]
 from airflow_pipeline import (
     build_gold_candidate,
     build_silver,
@@ -37,9 +40,9 @@ from airflow_pipeline import (
 )
 
 try:  # Airflow 3 ships the standard operators provider
-    from airflow.providers.standard.operators.python import PythonOperator
+    from airflow.providers.standard.operators.python import PythonOperator  # pyright: ignore[reportMissingImports]
 except ImportError:  # Airflow 2
-    from airflow.operators.python import PythonOperator
+    from airflow.operators.python import PythonOperator  # pyright: ignore[reportMissingImports]
 
 
 def _param(context, name, default):
@@ -81,4 +84,4 @@ with DAG(
     gold = PythonOperator(task_id="build_gold_candidate", python_callable=build_gold_candidate)
     publish = PythonOperator(task_id="publish_gold", python_callable=publish_gold_task)
 
-    ingest >> extract >> silver >> embed >> gold >> publish
+    ingest >> extract >> silver >> embed >> gold >> publish  # pyright: ignore[reportUnusedExpression]

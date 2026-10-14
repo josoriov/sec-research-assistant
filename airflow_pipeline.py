@@ -24,6 +24,8 @@ import sys
 from pathlib import Path
 from urllib.parse import quote
 
+from psycopg import sql
+
 REPO_ROOT = Path(__file__).resolve().parent
 DBT_DIR = REPO_ROOT / "dbt"
 
@@ -129,12 +131,17 @@ def publish_gold(connection=None, *, schema: str = GOLD_SCHEMA,
             summary = {}
             for relation in relations:
                 candidate = f"{relation}{CANDIDATE_SUFFIX}"
-                conn.execute(f'drop table if exists {schema}."{relation}"')
-                conn.execute(f'alter table {schema}."{candidate}" rename to "{relation}"')
+                conn.execute(sql.SQL("drop table if exists {}.{}").format(
+                    sql.Identifier(schema), sql.Identifier(relation)))
+                conn.execute(sql.SQL("alter table {}.{} rename to {}").format(
+                    sql.Identifier(schema), sql.Identifier(candidate),
+                    sql.Identifier(relation)))
                 # Candidates are revoked from the API role (see api_grants.sql);
                 # grant SELECT back on the table that is now served.
                 if api_role:
-                    conn.execute(f'grant select on {schema}."{relation}" to "{api_role}"')
+                    conn.execute(sql.SQL("grant select on {}.{} to {}").format(
+                        sql.Identifier(schema), sql.Identifier(relation),
+                        sql.Identifier(api_role)))
                 summary[relation] = _count(conn, schema, relation)
         return summary
     finally:
