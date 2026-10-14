@@ -11,6 +11,9 @@ __pycache__
 dbt/target
 dbt/logs
 dbt/dbt_packages
+web/node_modules
+web/dist
+web/.astro
 .env
 .env.*
 .aws

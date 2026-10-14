@@ -88,6 +88,30 @@ services:
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
 
+  # Natural-language question UI (Astro SSR, task T012). It forwards the browser's
+  # same-origin /api/ask request to the API over the Compose network, so the API
+  # host stays private and no CORS is needed.
+  web:
+    image: localhost/sec-research-assistant_web:cpu
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=64m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_started
+    environment:
+      API_BASE_URL: http://app:8000
+      HOST: 0.0.0.0
+      PORT: "4321"
+    ports:
+      - "127.0.0.1:${WEB_PORT:-4321}:4321"
+
   # One-shot: create the Airflow metadata database on fresh or existing volumes.
   airflow-db-init:
     image: docker.io/library/postgres:16
