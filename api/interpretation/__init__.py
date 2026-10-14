@@ -2,7 +2,7 @@
 
 Release v0.2 stage 1 (task T009): validate interpreted fields against
 `QuestionRequest` and the T005 routing rules before any query. Stage 2 (task
-T010) adds the LLM interpreter; stage 3 wires this into `POST /questions`.
+T010) adds the LLM interpreter; stage 3 wires this into `POST /answer`.
 """
 from __future__ import annotations
 

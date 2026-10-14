@@ -49,7 +49,7 @@ COMPOSE="$COMPOSE" ./db/verify.sh
 ```
 
 With an LLM configured, `/health` reports `"answer_composition":true` and
-`POST /questions` includes the generated reply in `answer.text` with citations.
+`POST /answer` includes the generated reply in `answer.text` with citations.
 After changing LLM settings in `.env`, recreate only the API:
 
 ```sh
@@ -87,7 +87,7 @@ The DAG has no schedule: unpausing it alone does not start a run.
 curl --fail http://localhost:18000/docs -o /dev/null
 curl --fail http://localhost:18000/openapi.json -o /dev/null
 curl --fail http://localhost:19001 -o /dev/null
-curl --fail http://localhost:18000/questions \
+curl --fail http://localhost:18000/answer \
   -H 'Content-Type: application/json' \
   -d '{"company":"AAPL","metric":"revenue","fiscal_years":[2024]}'
 $COMPOSE ps
@@ -96,7 +96,7 @@ $COMPOSE exec -T airflow cat /opt/airflow/simple_auth_manager_passwords.json.gen
 
 With the configured ports, open:
 
-- API docs: <http://localhost:18000/docs> (try `POST /questions`).
+- API docs: <http://localhost:18000/docs> (try `POST /answer`).
 - Airflow: <http://localhost:18080>. Use the username/password printed by the
   last command; standalone generates them.
 - MinIO: <http://localhost:19001> (login with `.env`'s `MINIO_ROOT_USER` and

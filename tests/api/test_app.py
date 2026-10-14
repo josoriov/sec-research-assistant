@@ -41,10 +41,10 @@ def _annual_row():
             391035000000, False, 1, 2, "0000320193-24-000123", "10-K", "2024-11-01")
 
 
-def test_questions_route_is_registered():
+def test_answer_route_is_registered():
     assert any(
         isinstance(route, APIRoute)
-        and route.path == "/questions"
+        and route.path == "/answer"
         and route.methods is not None
         and "POST" in route.methods
         for route in app.routes

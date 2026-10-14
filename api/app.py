@@ -1,4 +1,4 @@
-"""FastAPI application exposing POST /questions (tasks T005 and T006).
+"""FastAPI application exposing POST /answer (tasks T005 and T006).
 
 The route opens a read-only gold connection per request, runs the approved tools
 (`api.router.answer_question`), and — when a language model is configured —
@@ -35,9 +35,9 @@ def create_app(client=None) -> FastAPI:
 
     # exclude_unset omits `answer` when composition is disabled, so the T005
     # response contract is preserved (H008); nested explicit NULLs are untouched.
-    @app.post("/questions", response_model=QuestionResponse,
+    @app.post("/answer", response_model=QuestionResponse,
               response_model_exclude_unset=True)
-    def questions(request: QuestionRequest) -> QuestionResponse:
+    def answer(request: QuestionRequest) -> QuestionResponse:
         conn = db.connect()
         try:
             return answer_question_with_citations(

@@ -86,7 +86,7 @@ other companies, and stopping the stack. With the example ports, interactive API
 docs are at <http://localhost:18000/docs>. Once the pipeline succeeds:
 
 ```sh
-curl --fail http://localhost:18000/questions \
+curl --fail http://localhost:18000/answer \
   -H 'Content-Type: application/json' \
   -d '{"company":"AAPL","metric":"revenue","fiscal_years":[2024,2025],"question":"why did revenue change?"}'
 ```

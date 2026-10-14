@@ -9,7 +9,7 @@ not part of the current API. This is the public summary of the local work plan.
 2. **Interpret natural-language questions on the server.** Reuse the LLM client
    to extract metrics and years. Explicit user selections take precedence;
    validate every result before querying. The model never generates SQL.
-3. **Connect interpretation to `POST /questions`.** Preserve the complete
+3. **Connect interpretation to `POST /answer`.** Preserve the complete
    evidence package and handle clarification and provider errors.
 4. **Build the Astro question form.** Add company and optional metric selectors,
    a prompt field, loading/error states, and a correction flow.

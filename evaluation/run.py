@@ -1,7 +1,7 @@
 """Evaluate the question API over published gold (task T008).
 
 Runs the 25-question set in ``evaluation/questions.json`` through the real
-``POST /questions`` endpoint (it starts ``python -m api`` itself), checks each
+``POST /answer`` endpoint (it starts ``python -m api`` itself), checks each
 answer against hand-checked ground truth from published gold, verifies
 gold -> silver -> bronze lineage and that the API role is denied the lower
 layers, and writes ``evaluation/results.json``, ``evaluation/citation-review.md``
@@ -94,7 +94,7 @@ def start_api(port: int) -> subprocess.Popen:
 
 def ask(base: str, payload: dict) -> tuple[dict, float]:
     request = urllib.request.Request(
-        base + "/questions",
+        base + "/answer",
         data=json.dumps(payload).encode(),
         headers={"content-type": "application/json"},
     )

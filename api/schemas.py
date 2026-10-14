@@ -1,4 +1,4 @@
-"""Request/response models for POST /questions.
+"""Request/response models for POST /answer.
 
 Pydantic validates the shape of the request (types, ranges, enum values) before
 any tool runs; the router then resolves company/metric/period and either returns

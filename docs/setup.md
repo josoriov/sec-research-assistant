@@ -332,7 +332,7 @@ docker compose exec postgres psql -U sec_admin -d sec_research \
 
 ## 8. Ask questions (FastAPI)
 
-`api/` serves `POST /questions` over the published gold datasets only. It
+`api/` serves `POST /answer` over the published gold datasets only. It
 connects with the read-only `GOLD_API_DB_USER` role, so the database — not just
 the application — denies access to `silver` and `bronze`. Routing is
 deterministic: the request is resolved and validated, then mapped to approved
@@ -340,7 +340,7 @@ tools. The LLM composes answers after retrieval; natural-language interpretation
 of metric and year selections is planned work.
 
 Compose starts the API automatically at `http://localhost:18000` with the example
-ports. Use `/docs`, `/health`, or `POST /questions`; do not start a second API
+ports. Use `/docs`, `/health`, or `POST /answer`; do not start a second API
 process inside `app`.
 
 For optional host development, install the lock above and source `.env`. Use a
@@ -357,7 +357,7 @@ port at 8000 and maps `.env`'s `API_PORT` to it on localhost.
 ### Request
 
 ```jsonc
-POST /questions
+POST /answer
 {
   "company": "AAPL",          // ticker or numeric CIK (≤10 digits; required)
   "metric": "revenue",        // revenue | net_income | operating_cash_flow
@@ -414,7 +414,7 @@ comparison carries each side's gold source and flags an ambiguous (restated or
 conflicting) input in `notes`.
 
 ```sh
-curl -s localhost:8000/questions -H 'content-type: application/json' -d '{
+curl -s localhost:8000/answer -H 'content-type: application/json' -d '{
   "company": "AAPL", "metric": "revenue", "fiscal_years": [2023, 2024],
   "question": "why did revenue change?"}'
 ```
@@ -435,7 +435,7 @@ curl -s localhost:8000/questions -H 'content-type: application/json' -d '{
 ## 9. Compose cited answers (LLM)
 
 The answer composer sends the evidence package to an OpenAI-compatible chat model and
-attaches a cited `answer` to the `POST /questions` response. No SDK is used: the
+attaches a cited `answer` to the `POST /answer` response. No SDK is used: the
 client is a standard-library `urllib` call to `<LLM_BASE_URL>/chat/completions`,
 so the project adds no dependency and works with OpenAI, a compatible gateway, or
 a local server (Ollama/LM Studio/vLLM).
@@ -500,7 +500,7 @@ When configured, each `ok` response gains an `answer` object; the
 The Compose `app` service forwards the LLM settings from `.env`. After editing
 them, run `docker compose up -d --no-deps --force-recreate app` (or the Podman
 equivalent). `/health` reports `answer_composition: true` when configured;
-`POST /questions` then includes the generated reply in `answer.text`.
+`POST /answer` then includes the generated reply in `answer.text`.
 
 ## 10. Schedule the pipeline (Airflow)
 
@@ -649,7 +649,7 @@ evaluation.
 ### Evaluate
 
 `evaluation/run.py` runs the 25-question set in `evaluation/questions.json`
-through the real `POST /questions` endpoint (use `--base` for the running API), checks
+through the real `POST /answer` endpoint (use `--base` for the running API), checks
 each answer against hand-checked ground truth from published gold, verifies
 gold → silver → bronze lineage and that the API role is denied the lower layers,
 and writes `evaluation/results.json` and `docs/evaluation-report.md`:
