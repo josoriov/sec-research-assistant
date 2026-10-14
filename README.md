@@ -8,9 +8,10 @@ flow.
 
 The implementation combines Python, SQL, Airflow, dbt, PostgreSQL, pgvector,
 MinIO, FastAPI, and a local embedding model. An optional language model composes
-answers from calculated figures and retrieved passages. The backend and
-evaluation are implemented; an Astro interface and natural-language question
-interpretation are planned in the [roadmap](TODO.md).
+answers from calculated figures and retrieved passages and interprets
+natural-language questions. The backend, question API, and evaluation are
+implemented; the Astro web interface is in progress per the
+[roadmap](TODO.md).
 
 ## Architecture
 
@@ -42,6 +43,7 @@ model, the API returns calculations and evidence without making an LLM call.
 | --- | --- | --- |
 | Data preparation | Archives SEC snapshots, validates financial facts and passages, generates embeddings, and publishes gold with quality checks. | [Run instructions](docs/run.md) · [Setup and recovery](docs/setup.md) |
 | Question answering | Returns financial values, period comparisons, retrieved passages, and optional cited explanations with limitations or abstentions. | [API contract](docs/setup.md#8-ask-questions-fastapi) · [Example response](docs/example-response.json) |
+| Question UI | An Astro form (company and optional metric selectors, prompt) submits a natural-language question and surfaces clarifications and request errors. | [Web UI](docs/setup.md#8c-web-ui-astro) |
 
 ## Example results
 
@@ -76,14 +78,15 @@ Edit `.env` to set local passwords and your contact details in `SEC_USER_AGENT`,
 then build, start, and load the default AAPL sample:
 
 ```sh
-docker compose build app airflow
+docker compose build app web airflow
 docker compose up -d
 docker compose exec -T airflow airflow dags test sec_research_pipeline
 ```
 
 The [run guide](docs/run.md) includes readiness checks, Podman commands, loading
-other companies, and stopping the stack. With the example ports, interactive API
-docs are at <http://localhost:18000/docs>. Once the pipeline succeeds:
+other companies, and stopping the stack. With the example ports, the question UI
+is at <http://localhost:18001> and interactive API docs at
+<http://localhost:18000/docs>. Once the pipeline succeeds:
 
 ```sh
 curl --fail http://localhost:18000/answer \

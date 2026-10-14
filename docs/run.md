@@ -41,9 +41,10 @@ $COMPOSE config -q
 ## Start
 
 ```sh
-$COMPOSE build app airflow
+$COMPOSE build app web airflow
 $COMPOSE up -d
 curl --fail --retry 180 --retry-all-errors --retry-delay 2 http://localhost:18000/health
+curl --fail --retry 180 --retry-all-errors --retry-delay 2 http://localhost:18001/
 curl --fail --retry 180 --retry-all-errors --retry-delay 2 http://localhost:18080/api/v2/monitor/health
 COMPOSE="$COMPOSE" ./db/verify.sh
 ```
@@ -87,6 +88,7 @@ The DAG has no schedule: unpausing it alone does not start a run.
 ```sh
 curl --fail http://localhost:18000/docs -o /dev/null
 curl --fail http://localhost:18000/openapi.json -o /dev/null
+curl --fail http://localhost:18001 -o /dev/null
 curl --fail http://localhost:19001 -o /dev/null
 curl --fail http://localhost:18000/answer \
   -H 'Content-Type: application/json' \
@@ -97,6 +99,7 @@ $COMPOSE exec -T airflow cat /opt/airflow/simple_auth_manager_passwords.json.gen
 
 With the configured ports, open:
 
+- Question UI: <http://localhost:18001> (select a company, type a question).
 - API docs: <http://localhost:18000/docs> (try `POST /answer` or `POST /ask`).
 - Airflow: <http://localhost:18080>. Use the username/password printed by the
   last command; standalone generates them.

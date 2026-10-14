@@ -1,7 +1,9 @@
 # Roadmap
 
-The backend is implemented and evaluated. The following work is planned; it is
-not part of the current API. This is the public summary of the local work plan.
+The backend is implemented and evaluated. Stages 1–4 below are complete:
+server-side validation and interpretation, the question API, and the Astro form
+with clarification handling. Stages 5–6 remain planned. This is the public
+summary of the local work plan.
 
 1. **Validate interpreted requests.** Reuse `QuestionRequest`, the three existing
    metrics, and the approved tools. Ask for clarification when a company, metric,

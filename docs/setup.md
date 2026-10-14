@@ -480,6 +480,45 @@ curl -s localhost:8000/ask -H 'content-type: application/json' -d '{
   "company": "AAPL", "question": "What drove the revenue change between 2023 and 2024?"}'
 ```
 
+## 8c. Web UI (Astro)
+
+`web/` is an Astro SSR app (task T012). The user selects a supported company, an
+optional metric, and types a question; the browser posts it to the same-origin
+`/api/ask` route, which the Astro server proxies to the Python `POST /ask`
+endpoint over the network. The browser never talks to the Python API directly, so
+the API host stays private, no CORS is configured, and no credential reaches the
+browser.
+
+Compose starts it with the stack at `http://localhost:18001` (host port
+`WEB_PORT`). Rebuild it after a change:
+
+```sh
+docker compose build web
+docker compose up -d --no-deps web
+```
+
+Host development needs Node 22+:
+
+```sh
+cd web
+npm install
+API_BASE_URL=http://localhost:18000 npm run dev   # http://localhost:4321
+```
+
+`API_BASE_URL` is the server-side base URL of the Python API. Compose sets it to
+`http://app:8000`; on the host it is the running API (`http://localhost:18000`
+with the example `API_PORT`).
+
+- Supported companies (`AAPL`, `MSFT`, `GOOGL`, `AMZN`, `META`) and metrics
+  (`revenue`, `net_income`, `operating_cash_flow`) mirror the ingestion mapping
+  and the API taxonomy; they are listed in `web/src/lib/form.js`.
+- The form shows a loading state, disables the submit button, and guards against
+  duplicate submissions; interpretation `error` responses and request failures
+  are shown as messages; `needs_clarification` responses are listed while the
+  prompt and selections stay in place for correction.
+- Validation: `npm test` (pure form logic, `node --test`) and `npm run build`
+  (the SSR build). Displaying the complete answer is task T013.
+
 ## 9. Compose cited answers (LLM)
 
 The answer composer sends the evidence package to an OpenAI-compatible chat model and
