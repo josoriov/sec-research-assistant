@@ -11,7 +11,7 @@ const API_BASE_URL = (process.env.API_BASE_URL ?? 'http://localhost:8000').repla
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
   });
 }
 
@@ -36,6 +36,6 @@ export const POST: APIRoute = async ({ request }) => {
 
   return new Response(await upstream.text(), {
     status: upstream.status,
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
   });
 };

@@ -244,6 +244,7 @@ import { COMPANIES, METRICS } from '../lib/form.js';
       <section id="results" aria-labelledby="results-heading" hidden>
         <div class="results-header">
           <h2 id="results-heading">Response</h2>
+          <button type="button" id="clear-response" class="secondary">Clear response</button>
         </div>
         <p id="result-status"></p>
         <div id="result-body"></div>
@@ -251,10 +252,13 @@ import { COMPANIES, METRICS } from '../lib/form.js';
     </main>
 
     <script>
-      import { applyHttpResult, buildAskPayload, initialForm, reducer } from '../lib/form.js';
+      import { applyHttpResult, buildAskPayload, reducer } from '../lib/form.js';
       import { createRenderers } from '../lib/render.js';
+      import { restoreSession, saveSession } from '../lib/session.js';
 
-      let state = initialForm();
+      let tabStorage;
+      try { tabStorage = window.sessionStorage; } catch {}
+      let state = restoreSession(tabStorage);
 
       const el = (id) => document.getElementById(id);
       const formEl = el('ask-form');
@@ -268,20 +272,31 @@ import { COMPANIES, METRICS } from '../lib/form.js';
       const resultsEl = el('results');
       const resultStatusEl = el('result-status');
       const resultBodyEl = el('result-body');
+      const clearEl = el('clear-response');
       const themeEl = el('theme');
       const fieldErrors = { company: el('company-error'), question: el('question-error') };
       let renderedResponse;
 
       const { renderResponse, renderStatus } = createRenderers(document);
 
+      companyEl.value = state.company;
+      metricEl.value = state.metric;
+      questionEl.value = state.question;
       themeEl.value = document.documentElement.dataset.theme;
       themeEl.addEventListener('change', () => {
         document.documentElement.dataset.theme = themeEl.value;
         try { localStorage.setItem('sec-research-theme', themeEl.value); } catch {}
       });
+      clearEl.addEventListener('click', () => {
+        state = reducer(state, { type: 'clear_response' });
+        saveSession(tabStorage, state);
+        render();
+        questionEl.focus();
+      });
 
       function render() {
         submitEl.disabled = state.submitting;
+        clearEl.disabled = state.submitting;
         submitEl.textContent = state.submitting ? 'Asking…' : 'Ask';
 
         statusEl.hidden = !state.submitting;
@@ -341,12 +356,14 @@ import { COMPANIES, METRICS } from '../lib/form.js';
         state = next;
         render();
         if (!started) return;
+        const submittedForm = state;
 
         try {
           const response = await fetch('/api/ask', {
+            cache: 'no-store',
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(buildAskPayload(state)),
+            body: JSON.stringify(buildAskPayload(submittedForm)),
           });
           let body = null;
           try {
@@ -355,6 +372,9 @@ import { COMPANIES, METRICS } from '../lib/form.js';
             body = null; // a proxy/upstream error body that is not JSON
           }
           state = applyHttpResult(state, response, body);
+          if (response.ok && state.response === body) {
+            saveSession(tabStorage, { ...submittedForm, response: body });
+          }
         } catch {
           state = reducer(state, { type: 'failure' });
         }

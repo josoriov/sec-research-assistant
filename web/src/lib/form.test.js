@@ -107,6 +107,37 @@ test('edit updates one field and clears its error', () => {
   assert.equal(next.errors.company, undefined);
 });
 
+test('the last response remains visible during a new request and a transport failure', () => {
+  const response = { status: 'ok', answer: { text: 'Previous answer' } };
+  const loading = reducer(filled({ response }), { type: 'submit' });
+  assert.strictEqual(loading.response, response);
+  assert.strictEqual(reducer(loading, { type: 'failure' }).response, response);
+});
+
+test('a provider failure keeps the prior response and displays the new error', () => {
+  const response = { status: 'ok', answer: { text: 'Previous answer' } };
+  const loading = reducer(filled({ response }), { type: 'submit' });
+  const next = reducer(loading, {
+    type: 'response', response: { status: 'error', error: 'Provider unavailable' },
+  });
+  assert.strictEqual(next.response, response);
+  assert.equal(next.error, 'Provider unavailable');
+  assert.equal(next.submitting, false);
+});
+
+test('Clear response removes the result and messages while keeping the form editable', () => {
+  const prior = filled({
+    response: { status: 'ok' }, error: 'Old error',
+    clarifications: [{ field: 'metric', reason: 'Which metric?' }],
+  });
+  const next = reducer(prior, { type: 'clear_response' });
+  assert.equal(next.response, null);
+  assert.deepEqual(next.clarifications, []);
+  assert.equal(next.error, '');
+  assert.equal(next.company, prior.company);
+  assert.equal(next.question, prior.question);
+});
+
 // F054: a non-2xx JSON response (e.g. FastAPI's 422 ``{"detail": ...}``) must
 // never be accepted as a silent success by the browser response boundary.
 test('a non-2xx JSON response is shown as an error, not a success', () => {

@@ -86,9 +86,10 @@ export function reducer(state, action) {
         errors: {},
         error: '',
         clarifications: [],
-        response: null,
       };
     }
+    case 'clear_response':
+      return { ...state, response: null, clarifications: [], error: '' };
     case 'response':
       return applyResponse({ ...state, submitting: false }, action.response);
     case 'failure':
@@ -110,7 +111,7 @@ function applyResponse(state, response) {
     return {
       ...state,
       error: response.error || 'The assistant could not interpret the question.',
-      response,
+      response: state.response ?? response,
     };
   }
   return { ...state, clarifications: [], response };
