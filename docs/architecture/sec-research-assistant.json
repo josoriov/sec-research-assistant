@@ -3,280 +3,582 @@
   "diagram_type": "architecture",
   "meta": {
     "title": "SEC Research Assistant",
+    "locale": "en",
     "output": "docs/architecture/sec-research-assistant.html",
-    "quality_profile": "showcase"
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/josoriov/sec-research-assistant.git",
+      "revision": "ebc8d36079e7cc078de21db19970577591ac8e9a",
+      "link_mode": "local-only"
+    }
   },
   "components": [
     {
-      "id": "sec_edgar",
-      "type": "external",
-      "label": "SEC EDGAR",
-      "sublabel": "10-K filings + XBRL facts",
-      "pos": [40, 220],
-      "size": [160, 68]
+      "id": "research_browser",
+      "type": "frontend",
+      "label": "Research browser",
+      "sublabel": "Questions + cited evidence",
+      "tag": "Tab session storage",
+      "pos": [
+        40,
+        60
+      ],
+      "size": [
+        210,
+        82
+      ],
+      "sources": [
+        {
+          "path": "web/src/pages/index.astro",
+          "line": 349,
+          "end_line": 381,
+          "label": "Submit and retain response"
+        },
+        {
+          "path": "web/src/lib/render.js",
+          "line": 174,
+          "end_line": 205,
+          "label": "Citations and evidence"
+        },
+        {
+          "path": "web/src/lib/session.js",
+          "line": 5,
+          "end_line": 32,
+          "label": "Tab persistence"
+        }
+      ]
     },
     {
-      "id": "airflow",
-      "type": "backend",
-      "label": "Airflow",
-      "sublabel": "Schedule · retry · backfill",
-      "pos": [305, 40],
-      "size": [170, 68]
+      "id": "astro_server",
+      "type": "frontend",
+      "label": "Astro SSR",
+      "sublabel": "Same-origin /api/ask",
+      "tag": "HTTP no-store",
+      "pos": [
+        400,
+        60
+      ],
+      "size": [
+        210,
+        82
+      ],
+      "sources": [
+        {
+          "path": "web/src/pages/api/ask.ts",
+          "line": 9,
+          "end_line": 41,
+          "label": "HTTP proxy"
+        },
+        {
+          "path": "compose.yaml",
+          "line": 94,
+          "end_line": 113,
+          "label": "Web service environment"
+        }
+      ]
     },
     {
-      "id": "ingestor",
-      "type": "backend",
-      "label": "Python ingestor",
-      "sublabel": "Discover + download changes",
-      "tag": "identified + throttled",
-      "pos": [300, 220],
-      "size": [180, 72]
-    },
-    {
-      "id": "raw_store",
-      "type": "cloud",
-      "label": "MinIO raw store",
-      "sublabel": "Original files + manifest",
-      "tag": "content hashes",
-      "pos": [580, 220],
-      "size": [180, 72]
-    },
-    {
-      "id": "fact_pipeline",
-      "type": "backend",
-      "label": "Fact pipeline",
-      "sublabel": "Normalize periods + units",
-      "tag": "Python + dbt",
-      "pos": [40, 420],
-      "size": [180, 72]
-    },
-    {
-      "id": "financial_marts",
-      "type": "database",
-      "label": "PostgreSQL",
-      "sublabel": "Annual financial marts",
-      "tag": "source traceability",
-      "pos": [340, 420],
-      "size": [180, 72]
-    },
-    {
-      "id": "document_pipeline",
-      "type": "backend",
-      "label": "Document pipeline",
-      "sublabel": "Sections · passages · embeddings",
-      "tag": "changed content only",
-      "pos": [600, 420],
-      "size": [180, 76]
-    },
-    {
-      "id": "passage_index",
-      "type": "database",
-      "label": "pgvector",
-      "sublabel": "Passages + source metadata",
-      "tag": "provenance retained",
-      "pos": [900, 420],
-      "size": [180, 76]
-    },
-    {
-      "id": "question",
-      "type": "external",
-      "label": "Research question",
-      "sublabel": "Single company",
-      "pos": [40, 760],
-      "size": [180, 68]
-    },
-    {
-      "id": "api",
+      "id": "question_service",
       "type": "backend",
       "label": "FastAPI",
-      "sublabel": "Validate company · metric · period",
-      "pos": [300, 760],
-      "size": [180, 72]
+      "sublabel": "/ask interpret · /answer structured",
+      "tag": "Validate before tools",
+      "pos": [
+        760,
+        60
+      ],
+      "size": [
+        220,
+        82
+      ],
+      "sources": [
+        {
+          "path": "api/app.py",
+          "line": 49,
+          "end_line": 70,
+          "label": "API entry points"
+        },
+        {
+          "path": "api/ask.py",
+          "line": 26,
+          "end_line": 71,
+          "label": "Interpret then answer"
+        },
+        {
+          "path": "api/router.py",
+          "line": 137,
+          "end_line": 169,
+          "label": "Approved tool execution"
+        }
+      ]
     },
     {
-      "id": "approved_tools",
+      "id": "query_tools",
       "type": "security",
       "label": "Approved tools",
-      "sublabel": "Read-only SQL + filtered retrieval",
-      "tag": "no autonomous SQL",
-      "pos": [600, 760],
-      "size": [190, 76]
+      "sublabel": "Metrics + shared retrieval",
+      "tag": "API caches CPU encoder",
+      "pos": [
+        1120,
+        60
+      ],
+      "size": [
+        230,
+        82
+      ],
+      "sources": [
+        {
+          "path": "api/tools/financials.py",
+          "line": 32,
+          "end_line": 68,
+          "label": "Bound financial SQL"
+        },
+        {
+          "path": "api/tools/passages.py",
+          "line": 15,
+          "end_line": 30,
+          "label": "Cached API encoder"
+        },
+        {
+          "path": "embeddings/search.py",
+          "line": 23,
+          "end_line": 44,
+          "label": "Shared retrieval query"
+        }
+      ]
     },
     {
-      "id": "grounding",
-      "type": "backend",
-      "label": "Grounded generation",
-      "sublabel": "Calculations + cited evidence",
-      "tag": "abstain if unsupported",
-      "pos": [600, 950],
-      "size": [190, 76]
-    },
-    {
-      "id": "llm_api",
+      "id": "configured_model",
       "type": "external",
-      "label": "LLM API",
-      "sublabel": "Evidence-bound explanation",
-      "pos": [900, 950],
-      "size": [190, 68]
+      "label": "Configured LLM",
+      "sublabel": "Interpret + compose",
+      "tag": "Hosted or local",
+      "pos": [
+        760,
+        270
+      ],
+      "size": [
+        220,
+        82
+      ],
+      "sources": [
+        {
+          "path": "api/interpretation/interpreter.py",
+          "line": 147,
+          "end_line": 165,
+          "label": "Prompt interpretation"
+        },
+        {
+          "path": "api/answering/compose.py",
+          "line": 147,
+          "end_line": 197,
+          "label": "Cited composition and failures"
+        },
+        {
+          "path": "api/answering/client.py",
+          "line": 134,
+          "end_line": 153,
+          "label": "Optional model configuration"
+        }
+      ]
     },
     {
-      "id": "answer",
-      "type": "frontend",
-      "label": "Cited answer",
-      "sublabel": "Numbers · filing sections · limits",
-      "pos": [600, 1140],
-      "size": [190, 72]
+      "id": "dag_controller",
+      "type": "backend",
+      "label": "Airflow DAG",
+      "sublabel": "Manual runs + retries",
+      "tag": "One active run",
+      "pos": [
+        400,
+        270
+      ],
+      "size": [
+        230,
+        82
+      ],
+      "sources": [
+        {
+          "path": "airflow/dags/sec_research_pipeline.py",
+          "line": 52,
+          "end_line": 84,
+          "label": "Task order and retry policy"
+        },
+        {
+          "path": "evaluation/smoke.sh",
+          "line": 17,
+          "end_line": 27,
+          "label": "Smoke invokes the same DAG"
+        }
+      ]
+    },
+    {
+      "id": "edgar_source",
+      "type": "external",
+      "label": "SEC EDGAR",
+      "sublabel": "Submissions · facts · 10-K",
+      "tag": "Identified + throttled",
+      "pos": [
+        40,
+        490
+      ],
+      "size": [
+        210,
+        82
+      ],
+      "sources": [
+        {
+          "path": "ingestion/pipeline.py",
+          "line": 20,
+          "end_line": 25,
+          "label": "SEC endpoints"
+        },
+        {
+          "path": "ingestion/sec_client.py",
+          "line": 17,
+          "end_line": 56,
+          "label": "Identification and throttling"
+        }
+      ]
+    },
+    {
+      "id": "preparation_jobs",
+      "type": "backend",
+      "label": "Preparation jobs",
+      "sublabel": "Ingest · extract · embed · dbt",
+      "tag": "Run in Airflow service",
+      "pos": [
+        400,
+        490
+      ],
+      "size": [
+        230,
+        82
+      ],
+      "sources": [
+        {
+          "path": "airflow_pipeline.py",
+          "line": 68,
+          "end_line": 92,
+          "label": "Preparation subprocesses"
+        },
+        {
+          "path": "ingestion/pipeline.py",
+          "line": 150,
+          "end_line": 186,
+          "label": "Download and unpack facts"
+        },
+        {
+          "path": "extraction/pipeline.py",
+          "line": 64,
+          "end_line": 109,
+          "label": "Read raw and extract blocks"
+        }
+      ]
+    },
+    {
+      "id": "validated_layers",
+      "type": "database",
+      "label": "Bronze / silver",
+      "sublabel": "Facts · passages · vectors",
+      "tag": "Lineage + quarantine",
+      "pos": [
+        760,
+        490
+      ],
+      "size": [
+        220,
+        82
+      ],
+      "sources": [
+        {
+          "path": "ingestion/db.py",
+          "line": 26,
+          "end_line": 46,
+          "label": "Bronze manifests"
+        },
+        {
+          "path": "dbt/macros/staging.sql",
+          "line": 1,
+          "end_line": 62,
+          "label": "Fact typing and quarantine"
+        },
+        {
+          "path": "embeddings/db.py",
+          "line": 28,
+          "end_line": 60,
+          "label": "Silver vectors"
+        }
+      ]
+    },
+    {
+      "id": "served_gold",
+      "type": "database",
+      "label": "Published gold",
+      "sublabel": "PostgreSQL + pgvector",
+      "tag": "API reads these tables",
+      "pos": [
+        1120,
+        490
+      ],
+      "size": [
+        230,
+        82
+      ],
+      "sources": [
+        {
+          "path": "db/init/01-init.sh",
+          "line": 20,
+          "end_line": 40,
+          "label": "Schemas and restricted API role"
+        },
+        {
+          "path": "sql/search_passages.sql",
+          "line": 18,
+          "end_line": 35,
+          "label": "Gold-only filtered retrieval"
+        },
+        {
+          "path": "api/db.py",
+          "line": 15,
+          "end_line": 23,
+          "label": "API credentials"
+        }
+      ]
+    },
+    {
+      "id": "raw_objects",
+      "type": "cloud",
+      "label": "MinIO bronze",
+      "sublabel": "Original JSON + filing bytes",
+      "tag": "Hash-addressed objects",
+      "pos": [
+        400,
+        730
+      ],
+      "size": [
+        230,
+        82
+      ],
+      "sources": [
+        {
+          "path": "ingestion/pipeline.py",
+          "line": 105,
+          "end_line": 129,
+          "label": "Archive bytes and manifest"
+        },
+        {
+          "path": "ingestion/storage.py",
+          "line": 17,
+          "end_line": 39,
+          "label": "Write-once object storage"
+        },
+        {
+          "path": "extraction/pipeline.py",
+          "line": 74,
+          "end_line": 85,
+          "label": "Read archived bytes"
+        }
+      ]
+    },
+    {
+      "id": "candidate_tables",
+      "type": "database",
+      "label": "Gold candidates",
+      "sublabel": "Build + dbt quality tests",
+      "tag": "API SELECT revoked",
+      "pos": [
+        760,
+        730
+      ],
+      "size": [
+        220,
+        82
+      ],
+      "sources": [
+        {
+          "path": "airflow_pipeline.py",
+          "line": 89,
+          "end_line": 92,
+          "label": "Candidate build"
+        },
+        {
+          "path": "dbt/models/gold/annual_metrics.sql",
+          "line": 1,
+          "end_line": 12,
+          "label": "Candidate alias and silver input"
+        },
+        {
+          "path": "dbt/macros/api_grants.sql",
+          "line": 13,
+          "end_line": 20,
+          "label": "Candidate isolation"
+        }
+      ]
+    },
+    {
+      "id": "gold_publisher",
+      "type": "backend",
+      "label": "Atomic publisher",
+      "sublabel": "Swap tables + grant SELECT",
+      "tag": "Runs after tests pass",
+      "pos": [
+        1120,
+        730
+      ],
+      "size": [
+        230,
+        82
+      ],
+      "sources": [
+        {
+          "path": "airflow_pipeline.py",
+          "line": 102,
+          "end_line": 149,
+          "label": "Transactional publication"
+        },
+        {
+          "path": "airflow/dags/sec_research_pipeline.py",
+          "line": 77,
+          "end_line": 84,
+          "label": "Publish follows validated build"
+        }
+      ]
     }
   ],
   "boundaries": [
     {
-      "kind": "region",
-      "label": "1 · Incremental ingestion",
-      "wraps": ["airflow", "ingestor", "raw_store"],
-      "pad": 30
-    },
-    {
-      "kind": "region",
-      "label": "2 · Governed preparation",
-      "wraps": ["fact_pipeline", "financial_marts", "document_pipeline", "passage_index"],
-      "pad": 30
-    },
-    {
       "kind": "security-group",
-      "label": "3 · Evidence-based answering",
-      "wraps": ["api", "approved_tools", "grounding"],
+      "label": "FastAPI container · gold-only credentials",
+      "wraps": [
+        "question_service",
+        "query_tools"
+      ],
       "pad": 30
     }
   ],
   "connections": [
     {
-      "id": "discover_filings",
-      "from": "sec_edgar",
-      "to": "ingestor",
+      "id": "browser_request",
+      "from": "research_browser",
+      "to": "astro_server",
+      "label": "HTTP /api/ask",
+      "variant": "emphasis"
+    },
+    {
+      "id": "proxy_request",
+      "from": "astro_server",
+      "to": "question_service",
+      "label": "HTTP /ask",
+      "variant": "emphasis"
+    },
+    {
+      "id": "validated_execution",
+      "from": "question_service",
+      "to": "query_tools",
+      "label": "validated inputs",
+      "variant": "security"
+    },
+    {
+      "id": "model_calls",
+      "from": "question_service",
+      "to": "configured_model",
+      "label": "if configured",
+      "variant": "dashed"
+    },
+    {
+      "id": "read_published",
+      "from": "query_tools",
+      "to": "served_gold",
+      "label": "SELECT gold",
+      "variant": "security"
+    },
+    {
+      "id": "run_preparation",
+      "from": "dag_controller",
+      "to": "preparation_jobs",
+      "label": "runs CLIs + dbt",
+      "variant": "default"
+    },
+    {
+      "id": "fetch_sources",
+      "from": "edgar_source",
+      "to": "preparation_jobs",
       "label": "filings + facts",
       "variant": "emphasis"
     },
     {
-      "id": "orchestrate_ingestion",
-      "from": "airflow",
-      "to": "ingestor",
-      "label": "orchestrates",
-      "fromSide": "bottom",
-      "toSide": "top"
+      "id": "archive_objects",
+      "from": "preparation_jobs",
+      "to": "raw_objects",
+      "label": "archive / read bytes",
+      "variant": "default"
     },
     {
-      "id": "persist_raw",
-      "from": "ingestor",
-      "to": "raw_store",
-      "label": "raw + manifest",
-      "variant": "emphasis"
+      "id": "persist_layers",
+      "from": "preparation_jobs",
+      "to": "validated_layers",
+      "label": "write + validate",
+      "variant": "default"
     },
     {
-      "id": "prepare_facts",
-      "from": "raw_store",
-      "to": "fact_pipeline",
-      "label": "XBRL facts"
-    },
-    {
-      "id": "build_marts",
-      "from": "fact_pipeline",
-      "to": "financial_marts",
-      "label": "dbt models + tests"
-    },
-    {
-      "id": "prepare_documents",
-      "from": "raw_store",
-      "to": "document_pipeline",
-      "label": "10-K content"
-    },
-    {
-      "id": "index_passages",
-      "from": "document_pipeline",
-      "to": "passage_index",
-      "label": "passages + vectors"
-    },
-    {
-      "id": "submit_question",
-      "from": "question",
-      "to": "api",
-      "label": "question",
-      "variant": "emphasis"
-    },
-    {
-      "id": "route_tools",
-      "from": "api",
-      "to": "approved_tools",
-      "label": "validated request",
-      "variant": "security"
-    },
-    {
-      "id": "query_metrics",
-      "from": "approved_tools",
-      "to": "financial_marts",
-      "label": "parameterized SQL",
-      "variant": "security",
-      "fromSide": "top",
-      "toSide": "bottom"
-    },
-    {
-      "id": "retrieve_evidence",
-      "from": "approved_tools",
-      "to": "passage_index",
-      "label": "metadata-filtered retrieval",
-      "variant": "security",
-      "fromSide": "top",
-      "toSide": "bottom"
-    },
-    {
-      "id": "ground_answer",
-      "from": "approved_tools",
-      "to": "grounding",
-      "label": "numbers + passages",
-      "variant": "emphasis"
-    },
-    {
-      "id": "request_completion",
-      "from": "grounding",
-      "to": "llm_api",
-      "label": "prompt + evidence",
-      "variant": "dashed",
+      "id": "build_candidates",
+      "from": "preparation_jobs",
+      "to": "candidate_tables",
+      "label": "build + test",
+      "variant": "default",
       "fromSide": "right",
       "toSide": "left"
     },
     {
-      "id": "deliver_answer",
-      "from": "grounding",
-      "to": "answer",
-      "label": "cited response",
+      "id": "candidate_inputs",
+      "from": "validated_layers",
+      "to": "candidate_tables",
+      "label": "silver rows",
+      "variant": "default"
+    },
+    {
+      "id": "validated_candidates",
+      "from": "candidate_tables",
+      "to": "gold_publisher",
+      "label": "after tests pass",
+      "variant": "security"
+    },
+    {
+      "id": "publish_tables",
+      "from": "gold_publisher",
+      "to": "served_gold",
+      "label": "atomic swap",
       "variant": "emphasis"
     }
   ],
   "cards": [
     {
       "dot": "cyan",
-      "title": "MVP scope",
+      "title": "Question journey",
       "items": [
-        "5 companies · 3 years of 10-K filings",
-        "Revenue · net income · operating cash flow",
-        "No investment advice, real-time ingest, or autonomous SQL"
+        "UI → same-origin proxy → /ask: infer metric and years, validate, query, compose.",
+        "/answer accepts structured selections; without a model it returns evidence only.",
+        "/ask requires a configured model; ambiguity requests clarification, provider errors stay explicit."
       ]
     },
     {
       "dot": "emerald",
-      "title": "Governed evidence",
+      "title": "Data preparation and publication",
       "items": [
-        "Resolve amendments, periods, units, and duplicates explicitly",
-        "Retain accession, section, URL, hashes, and model version",
-        "Treat document text as data; separate reports from inference"
+        "Bronze: MinIO holds original bytes; PostgreSQL holds manifests, facts and extracted blocks.",
+        "Silver types and quarantines rows; CPU embeddings are reused by content and version.",
+        "Gold uses tested candidates; Airflow publishes them in one transaction and restores API SELECT.",
+        "Smoke ingestion is followed by this same DAG with skip_ingestion=true."
       ]
     },
     {
-      "dot": "amber",
-      "title": "Operational proof",
+      "dot": "rose",
+      "title": "Runtime and source boundaries",
       "items": [
-        "Idempotent reruns · quarantine failures · historical backfills",
-        "Track freshness, failures, latency, and API cost",
-        "Evaluate 30–50 checked questions, including prompt injection"
+        "Logical bronze/silver, candidate and served stores share one PostgreSQL + pgvector server.",
+        "Pipeline jobs and publisher run in Airflow; the API has only gold credentials.",
+        "The model sees prompts and selected evidence; citation IDs are checked against supplied sources.",
+        "Source references use a verified local snapshot of the current uncommitted worktree."
       ]
     }
   ]
