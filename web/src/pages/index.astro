@@ -10,45 +10,119 @@ import { COMPANIES, METRICS } from '../lib/form.js';
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>SEC Research Assistant</title>
+    <script is:inline>
+      let savedTheme;
+      try { savedTheme = localStorage.getItem('sec-research-theme'); } catch {}
+      document.documentElement.dataset.theme = ['light', 'dark'].includes(savedTheme)
+        ? savedTheme
+        : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    </script>
     <style>
-      :root { color-scheme: light dark; }
-      body {
-        font: 16px/1.5 system-ui, sans-serif;
-        margin: 0;
-        padding: 2rem 1rem;
-        display: flex;
-        justify-content: center;
+      :root {
+        color-scheme: dark;
+        --background: #101820;
+        --surface: #182530;
+        --input: #111c26;
+        --text: #e7edf4;
+        --muted: #a9bacb;
+        --accent: #8ac7ff;
+        --button-text: #10202e;
+        --line: #3a4e62;
+        --field-line: #61778c;
+        --danger: #ffb4ab;
+        --danger-line: #c87b7e;
+        --danger-surface: #2f2128;
+        --selection: #244b70;
       }
-      main { width: min(40rem, 100%); }
-      h1 { font-size: 1.5rem; }
-      .field { margin-block: 1rem; display: flex; flex-direction: column; gap: 0.25rem; }
+      :root[data-theme="light"] {
+        color-scheme: light;
+        --background: #f5f7fa;
+        --surface: #ffffff;
+        --input: #f8fafc;
+        --text: #182b3d;
+        --muted: #52677b;
+        --accent: #245fa8;
+        --button-text: #ffffff;
+        --line: #d7e0e8;
+        --field-line: #8193a5;
+        --danger: #ab2939;
+        --danger-line: #c86673;
+        --danger-surface: #fff1f2;
+        --selection: #d8e9fc;
+      }
+      * { box-sizing: border-box; }
+      body {
+        font: 16px/1.6 Arial, Helvetica, sans-serif;
+        margin: 0;
+        padding: 2.5rem 1rem;
+        color: var(--text);
+        background: var(--background);
+      }
+      main { width: min(48rem, 100%); min-width: 0; margin-inline: auto; }
+      .page-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+      h1 { font-size: 1.6rem; letter-spacing: -0.02em; margin: 0; }
+      .theme-control { display: flex; align-items: center; gap: 0.6rem; }
+      .theme-control label { font-size: 0.875rem; color: var(--muted); }
+      .intro { color: var(--muted); margin-block: 1rem 1.5rem; }
+      form { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 0.25rem 1.25rem 1.25rem; }
+      a { color: var(--accent); }
+      a:focus-visible,
+      button:focus-visible,
+      select:focus-visible,
+      textarea:focus-visible,
+      summary:focus-visible {
+        outline: 3px solid var(--accent);
+        outline-offset: 3px;
+        border-radius: 3px;
+      }
+      ::selection { background: var(--selection); color: var(--text); }
+      .field { margin-block: 1rem; display: flex; flex-direction: column; gap: 0.3rem; }
       label { font-weight: 600; }
-      select, textarea, button { font: inherit; padding: 0.5rem; border-radius: 0.25rem; }
-      select, textarea { border: 1px solid currentColor; background: transparent; color: inherit; }
+      select, textarea, button { font: inherit; padding: 0.55rem 0.7rem; border-radius: 4px; }
+      select, textarea { border: 1px solid var(--field-line); background: var(--input); color: var(--text); }
+      select:hover, textarea:hover { border-color: var(--muted); }
       textarea { resize: vertical; }
       button {
-        border: 0;
-        background: #1a5fb4;
-        color: #fff;
+        border: 1px solid var(--accent);
+        background: var(--accent);
+        color: var(--button-text);
+        font-weight: 600;
         cursor: pointer;
         padding: 0.6rem 1.2rem;
       }
+      button:hover:not([disabled]) { filter: brightness(1.08); }
       button[disabled] { opacity: 0.6; cursor: progress; }
-      .error { color: #c01c28; margin: 0; }
-      #status { margin-block: 1rem 0; }
+      .secondary { border-color: var(--field-line); background: transparent; color: var(--text); font-weight: 400; font-size: 0.875rem; }
+      .error { color: var(--danger); margin: 0; }
+      #status { margin-block: 1rem 0; color: var(--muted); }
       #clarifications {
-        border: 1px solid #c01c28;
-        border-radius: 0.25rem;
-        padding: 0.5rem 1rem 0.5rem 1.75rem;
+        border: 1px solid var(--danger-line);
+        background: var(--danger-surface);
+        border-radius: 4px;
+        padding: 0.75rem 1rem 0.75rem 1.75rem;
         margin-block: 1rem;
       }
-      #request-error { border-left: 4px solid #c01c28; padding-left: 0.75rem; }
+      #request-error {
+        border-left: 4px solid var(--danger);
+        background: var(--danger-surface);
+        border-radius: 0 4px 4px 0;
+        padding: 0.6rem 0.75rem;
+      }
     </style>
   </head>
   <body>
     <main>
-      <h1>SEC Research Assistant</h1>
-      <p>
+      <header class="page-header">
+        <h1>SEC Research Assistant</h1>
+        <div class="theme-control">
+          <label for="theme">Theme</label>
+          <select id="theme" name="theme">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </div>
+      </header>
+      <p class="intro">
         Ask a question about a supported company's 10-K filings. The question is
         interpreted into a metric and fiscal years before the published data is
         queried.
@@ -101,7 +175,14 @@ import { COMPANIES, METRICS } from '../lib/form.js';
       const statusEl = el('status');
       const clarificationsEl = el('clarifications');
       const errorEl = el('request-error');
+      const themeEl = el('theme');
       const fieldErrors = { company: el('company-error'), question: el('question-error') };
+
+      themeEl.value = document.documentElement.dataset.theme;
+      themeEl.addEventListener('change', () => {
+        document.documentElement.dataset.theme = themeEl.value;
+        try { localStorage.setItem('sec-research-theme', themeEl.value); } catch {}
+      });
 
       function render() {
         submitEl.disabled = state.submitting;
