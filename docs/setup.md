@@ -315,7 +315,8 @@ parameterized exact nearest-neighbor query against `gold.retrieval_passages`
 only. It filters by company and/or accession and, by default, excludes
 superseded filings and serves only the active processing version; it returns the
 carried citation metadata and the full bounded passage text (the CLI prints a
-short preview of that text).
+short preview of that text). The question API reuses this query and result
+mapping with its gold-only connection, cached encoder, and fiscal-year filters.
 
 ```sh
 docker compose exec -T airflow python -m embeddings.search \

@@ -55,8 +55,9 @@ def test_search_maps_hits_and_excludes_superseded_by_default():
     assert "<=>" in conn.sql
     assert "p.text" in conn.sql
     assert "left(" not in conn.sql.lower()
-    assert conn.params[0] == "[0.25,-0.5]"
-    assert conn.params[1] == "fake-model"
+    assert conn.params["query_vector"] == "[0.25,-0.5]"
+    assert conn.params["model_version"] == "fake-model"
+    assert conn.params["include_superseded"] is False
 
 
 def test_search_returns_the_full_passage_text():
@@ -74,10 +75,10 @@ def test_search_filters_by_company_and_accession():
            cik=320193, accession="0000320193-25-000079")
     assert conn.sql is not None
     assert conn.params is not None
-    assert "p.cik = %s" in conn.sql
-    assert "p.accession = %s" in conn.sql
-    assert 320193 in conn.params
-    assert "0000320193-25-000079" in conn.params
+    assert "p.cik = %(cik)s" in conn.sql
+    assert "p.accession = %(accession)s" in conn.sql
+    assert conn.params["cik"] == 320193
+    assert conn.params["accession"] == "0000320193-25-000079"
 
 
 def test_search_can_include_superseded():
@@ -85,4 +86,5 @@ def test_search_can_include_superseded():
     search("how did revenue change?", encoder=FakeEncoder(), conn=conn,
            include_superseded=True)
     assert conn.sql is not None
-    assert "is_superseded" not in conn.sql
+    assert "%(include_superseded)s or p.is_superseded = false" in conn.sql
+    assert conn.params["include_superseded"] is True
