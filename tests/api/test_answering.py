@@ -12,8 +12,16 @@ from api.answering.compose import (
     compose_answer,
     configure_logging,
 )
-from api.answering.prompt import build_sources
+from api.answering.prompt import SYSTEM_PROMPT, build_sources
 from api.schemas import QuestionRequest
+
+
+def test_system_prompt_requires_inline_citation_ids():
+    # B3 (T014): the model cited sources in prose, so the UI had nothing to link.
+    # The prompt must require the evidence id inline so the UI can associate each
+    # claim with its source entry.
+    assert "square brackets" in SYSTEM_PROMPT
+    assert "never refer to a source by position or number" in SYSTEM_PROMPT
 
 
 class FakeClient:

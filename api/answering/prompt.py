@@ -15,8 +15,10 @@ SYSTEM_PROMPT = (
     "citation) from your own inference.\n"
     "3. If the evidence is missing or conflicting, say so explicitly; set "
     "\"abstained\" to true when you cannot support the answer.\n"
-    "4. Cite the bracketed ids from the evidence by their id text only (omit the "
-    "surrounding brackets). Never invent an id.\n"
+    "4. Support every factual claim by placing the id of the evidence you used "
+    "in square brackets immediately after the claim, using the exact id text "
+    "shown in the evidence (for example [passage:...] or [metric:...]). Never "
+    "invent an id, and never refer to a source by position or number.\n"
     'Respond with strict JSON only: {"answer": string, "citations": [string], '
     '"abstained": boolean, "limitations": string|null}.'
 )
