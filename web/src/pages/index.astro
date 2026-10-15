@@ -1,7 +1,10 @@
 ---
 // Task T012: question form + clarification/correction flow. Submitting posts to
 // the same-origin /api/ask server route (see src/pages/api/ask.ts), which
-// proxies to the Python POST /ask endpoint. Displaying the full answer is T013.
+// proxies to the Python POST /ask endpoint. Task T013 renders the complete
+// response: the cited answer, citations, calculations, passages, the interpreted
+// request, and response metadata. All untrusted text is written with
+// textContent, never innerHTML.
 import { COMPANIES, METRICS } from '../lib/form.js';
 ---
 <!doctype html>
@@ -109,6 +112,84 @@ import { COMPANIES, METRICS } from '../lib/form.js';
         padding: 0.6rem 0.75rem;
       }
     </style>
+    <!--
+      Response styles are global (T013, F056): the response is built with
+      document.createElement after hydration, and Astro scopes its regular
+      styles to template elements. Every rule is contained under #results.
+    -->
+    <style is:global>
+      #results { margin-block: 2.5rem; min-width: 0; }
+      #results .results-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding-bottom: 0.75rem; }
+      #results h2 { font-size: 1.3rem; letter-spacing: -0.02em; margin: 0; }
+      #results #result-status { font-weight: 600; color: var(--muted); }
+      #results #result-status[data-status="error"] { color: var(--danger); }
+      #results #result-status[data-status="ok"] { color: var(--accent); }
+      #results h3 { font-size: 1.1rem; margin-block: 1.75rem 0.5rem; }
+      #results h4 { margin-block: 1rem 0.25rem; }
+      #results dl {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 0.2rem 1rem;
+        margin: 0.4rem 0;
+      }
+      #results dt { font-weight: 600; color: var(--muted); }
+      #results dd { margin: 0; overflow-wrap: anywhere; }
+      #results .answer-text, #results .passage-text { white-space: pre-wrap; }
+      #results .answer-text { font-size: 1.05rem; }
+      #results a, #results a:visited { color: var(--accent); }
+      #results a { overflow-wrap: anywhere; }
+      #results .citation-ref {
+        vertical-align: super;
+        font-size: 0.75em;
+        font-weight: 600;
+        line-height: 1.4;
+        padding: 0 0.3em;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        background: var(--input);
+        text-decoration: none;
+      }
+      #results .citation-ref:hover { border-color: var(--accent); }
+      #results a:focus-visible, #results summary:focus-visible, #results .citation:focus {
+        outline: 3px solid var(--accent);
+        outline-offset: 3px;
+      }
+      #results .caveat, #results .no-answer {
+        border-left: 4px solid var(--danger);
+        background: var(--danger-surface);
+        border-radius: 0 4px 4px 0;
+        padding: 0.6rem 0.75rem;
+        margin-block: 0.75rem;
+      }
+      #results .citation-list { padding-left: 1.5rem; }
+      #results .citation {
+        margin-block: 0.9rem;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        padding: 0.6rem 0.75rem;
+      }
+      #results .citation-title { font-weight: 600; margin: 0 0 0.25rem; }
+      #results .citation:target { border-color: var(--accent); }
+      #results article { border-top: 1px solid var(--line); padding-top: 0.6rem; margin-top: 0.9rem; }
+      #results article:first-of-type { border-top: 0; padding-top: 0; margin-top: 0; }
+      #results details {
+        margin-block: 0.6rem;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        padding: 0.5rem 0.75rem;
+      }
+      #results summary { cursor: pointer; font-weight: 600; }
+      #results pre {
+        overflow-x: auto;
+        max-width: 100%;
+        padding: 0.6rem;
+        background: var(--input);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+      }
+    </style>
   </head>
   <body>
     <main>
@@ -159,10 +240,19 @@ import { COMPANIES, METRICS } from '../lib/form.js';
       <p id="status" role="status" aria-live="polite" hidden></p>
       <ul id="clarifications" aria-label="Clarifications needed" hidden></ul>
       <p id="request-error" role="alert" hidden></p>
+
+      <section id="results" aria-labelledby="results-heading" hidden>
+        <div class="results-header">
+          <h2 id="results-heading">Response</h2>
+        </div>
+        <p id="result-status"></p>
+        <div id="result-body"></div>
+      </section>
     </main>
 
     <script>
       import { applyHttpResult, buildAskPayload, initialForm, reducer } from '../lib/form.js';
+      import { createRenderers } from '../lib/render.js';
 
       let state = initialForm();
 
@@ -175,8 +265,14 @@ import { COMPANIES, METRICS } from '../lib/form.js';
       const statusEl = el('status');
       const clarificationsEl = el('clarifications');
       const errorEl = el('request-error');
+      const resultsEl = el('results');
+      const resultStatusEl = el('result-status');
+      const resultBodyEl = el('result-body');
       const themeEl = el('theme');
       const fieldErrors = { company: el('company-error'), question: el('question-error') };
+      let renderedResponse;
+
+      const { renderResponse, renderStatus } = createRenderers(document);
 
       themeEl.value = document.documentElement.dataset.theme;
       themeEl.addEventListener('change', () => {
@@ -193,10 +289,10 @@ import { COMPANIES, METRICS } from '../lib/form.js';
           ? 'Interpreting your question and retrieving evidence…'
           : '';
 
-        for (const [field, node] of Object.entries(fieldErrors)) {
+        for (const [field, element] of Object.entries(fieldErrors)) {
           const message = state.errors[field] ?? '';
-          node.hidden = !message;
-          node.textContent = message;
+          element.hidden = !message;
+          element.textContent = message;
         }
 
         errorEl.hidden = !state.error;
@@ -210,6 +306,18 @@ import { COMPANIES, METRICS } from '../lib/form.js';
             return li;
           }),
         );
+
+        if (state.response !== renderedResponse) {
+          renderedResponse = state.response;
+          resultsEl.hidden = !state.response;
+          if (state.response) {
+            renderStatus(resultStatusEl, state.response);
+            renderResponse(resultBodyEl, state.response);
+          } else {
+            resultStatusEl.textContent = '';
+            resultBodyEl.replaceChildren();
+          }
+        }
       }
 
       for (const [field, input] of [
