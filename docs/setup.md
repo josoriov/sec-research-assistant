@@ -1,8 +1,8 @@
 # Local environment setup
 
 Start with the [quickstart](run.md). This reference explains the implemented
-pipeline, manual stages, API contract, evaluation, and recovery. Planned UI and
-question interpretation work is listed in the public [roadmap](../TODO.md).
+pipeline, manual stages, API contract, question interpretation, web UI,
+evaluation, and recovery.
 
 The `compose.yaml` at the repository root follows the Compose specification, so
 it runs under **Docker Compose** or **Podman Compose**. Every credential is read
@@ -483,8 +483,8 @@ curl -s localhost:8000/ask -H 'content-type: application/json' -d '{
 
 ## 8c. Web UI (Astro)
 
-`web/` is an Astro SSR app (task T012). The user selects a supported company, an
-optional metric, and types a question; the browser posts it to the same-origin
+`web/` is an Astro SSR app (tasks T012–T013). The user selects a supported
+company, an optional metric, and types a question; the browser posts it to the same-origin
 `/api/ask` route, which the Astro server proxies to the Python `POST /ask`
 endpoint over the network. The browser never talks to the Python API directly, so
 the API host stays private, no CORS is configured, and no credential reaches the
@@ -495,7 +495,7 @@ Compose starts it with the stack at `http://localhost:18001` (host port
 
 ```sh
 docker compose build web
-docker compose up -d --no-deps web
+docker compose up -d --no-deps --force-recreate web
 ```
 
 Host development needs Node 22+:
@@ -517,8 +517,33 @@ with the example `API_PORT`).
   duplicate submissions; interpretation `error` responses and request failures
   are shown as messages; `needs_clarification` responses are listed while the
   prompt and selections stay in place for correction.
-- Validation: `npm test` (pure form logic, `node --test`) and `npm run build`
-  (the SSR build). Displaying the complete answer is task T013.
+- The last completed response and its question/selections survive refresh in the
+  same tab using `sessionStorage`; no additional model request is made on reload.
+  **Clear response** removes the displayed and saved response while keeping the
+  form. A new tab starts empty; closing the tab normally ends its saved session
+  (browser session recovery can restore closed tabs). Hard refresh only bypasses
+  the HTTP cache, so use **Clear response** to reset the result. If browser
+  storage is blocked or full, the page still works but cannot retain the result.
+  API requests/responses bypass the HTTP cache; saved results live only in the
+  current tab's session storage.
+- **Theme** switches between light and dark palettes. The initial theme follows
+  the system preference; an explicit choice is stored locally for later visits.
+- The response renders the complete `/ask` package (task T013): the answer text
+  with its citation references linked to the matching source entries; the
+  abstention flag and `limitations` kept visible rather than behind a
+  disclosure; citations with their kind, label, section, accession, and a
+  clickable source link; calculations with values, periods, units, comparison
+  results, ambiguity flags, source references, and notes; expandable passages
+  whose count is shown; how the prompt was interpreted with the validated
+  request; the model, token usage, latency, and cost metadata (missing fields
+  labelled `Unavailable`); and an expandable JSON view of the whole response.
+  When no generated answer is available the retrieved evidence and any returned
+  limitation are shown instead, and the state is explained.
+- All untrusted text (answer, passages, citations, error messages) is written
+  with `textContent`, never `innerHTML`, and only `http(s)` URLs can become a
+  link, so answer and filing content cannot execute HTML or script.
+- Validation: `npm test` (`node --test` for form, display, session, and page
+  logic) and `npm run build` (the SSR build).
 
 ## 9. Compose cited answers (LLM)
 

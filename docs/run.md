@@ -99,7 +99,8 @@ $COMPOSE exec -T airflow cat /opt/airflow/simple_auth_manager_passwords.json.gen
 
 With the configured ports, open:
 
-- Question UI: <http://localhost:18001> (select a company, type a question).
+- Question UI: <http://localhost:18001> (select a company, ask a question, and
+  read the cited answer with its calculations, passages, and metadata).
 - API docs: <http://localhost:18000/docs> (try `POST /answer` or `POST /ask`).
 - Airflow: <http://localhost:18080>. Use the username/password printed by the
   last command; standalone generates them.

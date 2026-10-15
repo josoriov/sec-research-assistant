@@ -9,9 +9,9 @@ flow.
 The implementation combines Python, SQL, Airflow, dbt, PostgreSQL, pgvector,
 MinIO, FastAPI, and a local embedding model. An optional language model composes
 answers from calculated figures and retrieved passages and interprets
-natural-language questions. The backend, question API, and evaluation are
-implemented; the Astro web interface is in progress per the
-[roadmap](TODO.md).
+natural-language questions. The backend, question API, evaluation, and Astro web
+interface are implemented and verified end to end. See the
+[journey checks](evaluation/journey.py).
 
 ## Architecture
 
@@ -43,7 +43,7 @@ model, the API returns calculations and evidence without making an LLM call.
 | --- | --- | --- |
 | Data preparation | Archives SEC snapshots, validates financial facts and passages, generates embeddings, and publishes gold with quality checks. | [Run instructions](docs/run.md) · [Setup and recovery](docs/setup.md) |
 | Question answering | Returns financial values, period comparisons, retrieved passages, and optional cited explanations with limitations or abstentions. | [API contract](docs/setup.md#8-ask-questions-fastapi) · [Example response](docs/example-response.json) |
-| Question UI | An Astro form (company and optional metric selectors, prompt) submits a natural-language question and surfaces clarifications and request errors. | [Web UI](docs/setup.md#8c-web-ui-astro) |
+| Question UI | An Astro form (company and optional metric selectors, prompt) submits a natural-language question and displays the cited answer with its citations, calculations, passages, limitations, and response metadata. | [Web UI](docs/setup.md#8c-web-ui-astro) |
 
 ## Example results
 
@@ -123,11 +123,10 @@ filings, and valid citation IDs do not prove that a claim is supported. The
 prompt-injection check covers one synthetic composition case. Recorded metrics
 are historical results, not a benchmark of subsequent dependency upgrades.
 
-The API currently accepts structured selections for one company per request;
-it does not interpret a free-text prompt into metric and year selections.
-The [roadmap](TODO.md) describes that work and the planned Astro interface.
-Public hosting requires authentication, request quotas, and spending controls.
-Investment recommendations are outside the project scope.
+The API accepts structured selections or a natural-language prompt for one
+company per request, interpreted into a metric and fiscal years. Public hosting
+requires authentication, request quotas, and spending controls. Investment
+recommendations are outside the project scope.
 
 ## License
 
