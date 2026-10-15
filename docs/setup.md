@@ -725,15 +725,14 @@ From a fresh checkout (stack up and `.env` sourced, as in sections 1–2), run:
 for c in AAPL MSFT GOOGL AMZN META; do
   docker compose exec -T airflow python -m ingestion --company "$c" --years 3
 done
-docker compose exec -T airflow python -m extraction
-docker compose exec -T airflow dbt build --select silver --indirect-selection cautious --project-dir dbt --profiles-dir dbt
-docker compose exec -T airflow python -m embeddings
-docker compose exec -T airflow dbt build --project-dir dbt --profiles-dir dbt
+docker compose exec -T airflow airflow dags test sec_research_pipeline \
+  -c '{"skip_ingestion": true}'
 ```
 
 With Podman, substitute `podman-compose exec -T airflow`/`podman-compose`. Reruns are
-idempotent. `evaluation/smoke.sh` runs this same sequence and then the
-evaluation.
+idempotent. The DAG extracts documents, validates silver, embeds passages, and
+tests gold candidates before publishing them atomically. `evaluation/smoke.sh`
+runs this same sequence and then the evaluation; a failed DAG stops the script.
 
 ### Evaluate
 

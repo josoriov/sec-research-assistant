@@ -162,7 +162,8 @@ def test_citation_support_excludes_answers_without_citations():
 def test_smoke_uses_airflow_for_preparation_and_host_for_evaluation(tmp_path):
     trace = tmp_path / "trace"
     compose = tmp_path / "compose.sh"
-    compose.write_text('printf "%s\\n" "$*" >> "$TRACE"\n')
+    compose.write_text('printf "%s\\n" "$*" >> "$TRACE"\n'
+                       'case "$*" in *"dags test"*) exit "${DAG_EXIT_CODE:-0}";; esac\n')
     python = tmp_path / "python.sh"
     python.write_text('#!/bin/sh\nset -eu\n'
                       'test "$PGHOST" = 127.0.0.1\n'
@@ -175,10 +176,19 @@ def test_smoke_uses_airflow_for_preparation_and_host_for_evaluation(tmp_path):
     script = Path(__file__).resolve().parents[2] / "evaluation" / "smoke.sh"
     subprocess.run(["sh", str(script)], env=env, check=True)
     calls = trace.read_text().splitlines()
-    assert len(calls) == 7
-    assert all(call.startswith("exec -T airflow ") for call in calls[:-1])
-    assert any("airflow dbt build" in call for call in calls)
-    assert calls[-1] == "host -m evaluation.run --base http://127.0.0.1:18000"
+    preparation = [
+        "exec -T airflow python -m ingestion --company AAPL --years 3",
+        "exec -T airflow python -m ingestion --company MSFT --years 3",
+        'exec -T airflow airflow dags test sec_research_pipeline -c {"skip_ingestion": true}',
+    ]
+    assert calls == preparation + [
+        "host -m evaluation.run --base http://127.0.0.1:18000",
+    ]
+
+    trace.write_text("")
+    result = subprocess.run(["sh", str(script)], env={**env, "DAG_EXIT_CODE": "1"})
+    assert result.returncode == 1
+    assert trace.read_text().splitlines() == preparation
 
 
 def test_regenerate_persists_summary_used_by_the_report(monkeypatch, tmp_path):
