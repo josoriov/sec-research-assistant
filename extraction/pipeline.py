@@ -14,8 +14,6 @@ from extraction import db
 from extraction.parse import PROCESSING_VERSION, extract_blocks
 from ingestion.pipeline import _minio_client
 
-METADATA_FIELDS = ("form", "filingDate", "reportDate", "primaryDocument")
-
 
 def _read_object(client, bucket: str, key: str) -> bytes:
     response = client.get_object(bucket, key)

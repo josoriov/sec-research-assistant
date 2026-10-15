@@ -7,9 +7,6 @@ from ingestion.db import connect  # same pipeline role/credentials as ingestion
 
 __all__ = [
     "connect",
-    "count_blocks",
-    "count_documents",
-    "count_failures",
     "ensure_schema",
     "load_filing_manifests",
     "load_submission_objects",
@@ -38,12 +35,6 @@ def load_filing_manifests(conn) -> list[dict]:
         {"id": r[0], "cik": r[1], "accession": r[2], "url": r[3], "object_key": r[4]}
         for r in rows
     ]
-
-
-def count_failures(conn) -> int:
-    return conn.execute(
-        "SELECT count(*) FROM bronze.filing_documents WHERE extraction_error IS NOT NULL"
-    ).fetchone()[0]
 
 
 def load_submission_objects(conn, cik: int) -> list[dict]:
@@ -112,11 +103,3 @@ def replace_blocks(conn, *, manifest_id, cik, accession, processing_version,
             )
         conn.commit()
     return len(blocks)
-
-
-def count_documents(conn) -> int:
-    return conn.execute("SELECT count(*) FROM bronze.filing_documents").fetchone()[0]
-
-
-def count_blocks(conn) -> int:
-    return conn.execute("SELECT count(*) FROM bronze.document_blocks").fetchone()[0]

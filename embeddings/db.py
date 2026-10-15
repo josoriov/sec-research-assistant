@@ -7,7 +7,6 @@ from ingestion.db import connect  # same pipeline role/credentials as ingestion
 
 __all__ = [
     "connect",
-    "count_embeddings",
     "ensure_schema",
     "existing_keys",
     "insert_embeddings",
@@ -59,10 +58,3 @@ def insert_embeddings(conn, rows) -> None:
             rows,
         )
     conn.commit()
-
-
-def count_embeddings(conn, model_version: str) -> int:
-    return conn.execute(
-        "SELECT count(*) FROM silver.passage_embeddings WHERE model_version = %s",
-        (model_version,),
-    ).fetchone()[0]

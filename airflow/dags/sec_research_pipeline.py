@@ -39,10 +39,7 @@ from airflow_pipeline import (
     publish_gold,
 )
 
-try:  # Airflow 3 ships the standard operators provider
-    from airflow.providers.standard.operators.python import PythonOperator  # pyright: ignore[reportMissingImports]
-except ImportError:  # Airflow 2
-    from airflow.operators.python import PythonOperator  # pyright: ignore[reportMissingImports]
+from airflow.providers.standard.operators.python import PythonOperator  # pyright: ignore[reportMissingImports]
 
 
 def _param(context, name, default):
